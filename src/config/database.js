@@ -7,6 +7,18 @@ const pool = mysql.createPool({
   queueLimit: 0,
 })
 
+const originalExecute = pool.execute.bind(pool)
+pool.execute = async (sql, params) => {
+  if (!Array.isArray(params)) {
+    console.error('❌ BAD QUERY - params not an array:', {
+      sql: sql.substring(0, 100),
+      params,
+      type: typeof params
+    })
+  }
+  return originalExecute(sql, params)
+}
+
 // Test connection on startup
 pool.getConnection()
   .then(conn => {
