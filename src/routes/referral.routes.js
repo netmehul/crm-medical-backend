@@ -6,6 +6,7 @@ const planGate           = require('../middleware/planGate');
 const asyncHandler       = require('../middleware/asyncHandler');
 
 router.use(auth);
+router.use(requireClinic);
 
 router.get('/',    asyncHandler((req, res) => ReferralController.getAll(req, res)));
 router.post('/',   planGate('referralsPerMonth'), asyncHandler((req, res) => ReferralController.create(req, res)));

@@ -2,10 +2,12 @@ const express = require('express');
 const router = express.Router();
 const MedicalRepController = require('../controllers/MedicalRepController');
 const auth = require('../middleware/auth');
+const requireClinic = require('../middleware/requireClinic');
 const planGate = require('../middleware/planGate');
 const asyncHandler = require('../middleware/asyncHandler');
 
 router.use(auth);
+router.use(requireClinic);
 router.use(planGate('mrManagement'));
 
 router.get('/',    asyncHandler((req, res) => MedicalRepController.getAll(req, res)));

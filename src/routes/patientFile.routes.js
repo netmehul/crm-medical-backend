@@ -5,6 +5,7 @@ const ReportController = require('../controllers/ReportController');
 const NoteController = require('../controllers/NoteController');
 const BillingController = require('../controllers/BillingController');
 const auth = require('../middleware/auth');
+const requireClinic = require('../middleware/requireClinic');
 const planGate = require('../middleware/planGate');
 const asyncHandler = require('../middleware/asyncHandler');
 const multer = require('multer');
@@ -31,6 +32,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 router.use(auth);
+router.use(requireClinic);
 
 router.get('/:patientId', asyncHandler((req, res) => PatientFileController.getFile(req, res)));
 router.put('/:patientId', asyncHandler((req, res) => PatientFileController.updateFile(req, res)));

@@ -2,10 +2,12 @@ const express = require('express');
 const router = express.Router();
 const PatientController = require('../controllers/PatientController');
 const auth = require('../middleware/auth');
+const requireClinic = require('../middleware/requireClinic');
 const planGate = require('../middleware/planGate');
 const asyncHandler = require('../middleware/asyncHandler');
 
 router.use(auth);
+router.use(requireClinic);
 
 router.get('/',    asyncHandler((req, res) => PatientController.getAll(req, res)));
 router.post('/',   planGate('patients'), asyncHandler((req, res) => PatientController.create(req, res)));

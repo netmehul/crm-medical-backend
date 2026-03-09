@@ -2,9 +2,11 @@ const express = require('express');
 const router = express.Router();
 const PrescriptionController = require('../controllers/PrescriptionController');
 const auth = require('../middleware/auth');
+const requireClinic = require('../middleware/requireClinic');
 const asyncHandler = require('../middleware/asyncHandler');
 
 router.use(auth);
+router.use(requireClinic);
 
 router.get('/',    asyncHandler((req, res) => PrescriptionController.getAll(req, res)));
 router.post('/',   asyncHandler((req, res) => PrescriptionController.create(req, res)));

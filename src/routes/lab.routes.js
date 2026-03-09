@@ -2,9 +2,11 @@ const express = require('express');
 const router = express.Router();
 const LabController = require('../controllers/LabController');
 const auth = require('../middleware/auth');
+const requireClinic = require('../middleware/requireClinic');
 const asyncHandler = require('../middleware/asyncHandler');
 
 router.use(auth);
+router.use(requireClinic);
 
 router.get('/active', asyncHandler((req, res) => LabController.getAllActive(req, res)));
 router.get('/',       asyncHandler((req, res) => LabController.getAll(req, res)));

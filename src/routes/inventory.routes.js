@@ -2,10 +2,12 @@ const express = require('express');
 const router = express.Router();
 const InventoryController = require('../controllers/InventoryController');
 const auth = require('../middleware/auth');
+const requireClinic = require('../middleware/requireClinic');
 const planGate = require('../middleware/planGate');
 const asyncHandler = require('../middleware/asyncHandler');
 
 router.use(auth);
+router.use(requireClinic);
 router.use(planGate('inventory'));
 
 router.get('/',          asyncHandler((req, res) => InventoryController.getAll(req, res)));
