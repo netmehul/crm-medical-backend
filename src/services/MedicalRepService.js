@@ -15,28 +15,29 @@ class MedicalRepService {
       params.push(like, like, like);
     }
 
-    const rows = db.all(
+    const [rows] = await db.execute(
       `SELECT * FROM medical_reps
        WHERE ${where}
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+      [...params, parseInt(limit), parseInt(offset)]
     );
 
-    const { total } = db.get(
+    const [countRows] = await db.execute(
       `SELECT COUNT(*) AS total FROM medical_reps WHERE ${where}`,
       params
     );
 
-    return paginatedResponse(rows, total, page, limit);
+    return paginatedResponse(rows, countRows[0].total, page, limit);
   }
 
   async getMedicalRep(id, clinicId) {
-    const rep = db.get(
+    const [rows] = await db.execute(
       `SELECT * FROM medical_reps
        WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [id, clinicId]
     );
+    const rep = rows[0];
     if (!rep) {
       throw { statusCode: 404, message: 'Medical rep not found' };
     }
@@ -45,9 +46,9 @@ class MedicalRepService {
 
   async createMedicalRep(clinicId, data) {
     const id = generateId();
-    const now = new Date().toISOString();
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-    db.run(
+    await db.execute(
       `INSERT INTO medical_reps
          (id, clinic_id, full_name, company, phone, email, territory, notes, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -60,7 +61,7 @@ class MedicalRepService {
       ]
     );
 
-    return this.getMedicalRep(id, clinicId);
+    return await this.getMedicalRep(id, clinicId);
   }
 
   async updateMedicalRep(id, clinicId, data) {
@@ -72,28 +73,28 @@ class MedicalRepService {
       if (data[f] !== undefined) allowed[f] = data[f];
     }
 
-    if (Object.keys(allowed).length === 0) return this.getMedicalRep(id, clinicId);
+    if (Object.keys(allowed).length === 0) return await this.getMedicalRep(id, clinicId);
 
-    allowed.updated_at = new Date().toISOString();
+    allowed.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
     const setClause = Object.keys(allowed).map(k => `${k} = ?`).join(', ');
     const values = [...Object.values(allowed), id, clinicId];
 
-    db.run(
+    await db.execute(
       `UPDATE medical_reps SET ${setClause}
        WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       values
     );
 
-    return this.getMedicalRep(id, clinicId);
+    return await this.getMedicalRep(id, clinicId);
   }
 
   async deleteMedicalRep(id, clinicId) {
-    const result = db.run(
-      `UPDATE medical_reps SET deleted_at = datetime('now')
+    const [result] = await db.execute(
+      `UPDATE medical_reps SET deleted_at = CURRENT_TIMESTAMP
        WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [id, clinicId]
     );
-    if (result.changes === 0) {
+    if (result.affectedRows === 0) {
       throw { statusCode: 404, message: 'Medical rep not found' };
     }
     return true;
@@ -103,9 +104,9 @@ class MedicalRepService {
     await this.getMedicalRep(mrId, clinicId);
 
     const id = generateId();
-    const now = new Date().toISOString();
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-    db.run(
+    await db.execute(
       `INSERT INTO mr_visits
          (id, mr_id, clinic_id, visit_date, purpose, products_discussed,
           samples_left, notes, logged_by, created_at)
@@ -121,32 +122,32 @@ class MedicalRepService {
       ]
     );
 
-    const visit = db.get(
+    const [rows] = await db.execute(
       `SELECT * FROM mr_visits WHERE id = ?`, [id]
     );
-    return visit;
+    return rows[0];
   }
 
   async getVisits(mrId, clinicId, query) {
     const { page, limit, offset } = getPagination(query);
 
-    const rows = db.all(
+    const [rows] = await db.execute(
       `SELECT v.*, u.full_name AS logged_by_name
        FROM mr_visits v
        LEFT JOIN users u ON u.id = v.logged_by AND u.deleted_at IS NULL
        WHERE v.mr_id = ? AND v.clinic_id = ?
        ORDER BY v.visit_date DESC
        LIMIT ? OFFSET ?`,
-      [mrId, clinicId, limit, offset]
+      [mrId, clinicId, parseInt(limit), parseInt(offset)]
     );
 
-    const { total } = db.get(
+    const [countRows] = await db.execute(
       `SELECT COUNT(*) AS total FROM mr_visits
        WHERE mr_id = ? AND clinic_id = ?`,
       [mrId, clinicId]
     );
 
-    return paginatedResponse(rows, total, page, limit);
+    return paginatedResponse(rows, countRows[0].total, page, limit);
   }
 }
 

@@ -26,97 +26,100 @@ class LabService {
       params.push(query.active === 'true' ? 1 : 0);
     }
 
-    const rows = db.all(
+    const [rows] = await db.execute(
       `SELECT * FROM external_labs WHERE ${where} ORDER BY name ASC LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+      [...params, parseInt(limit), parseInt(offset)]
     );
 
-    const { total } = db.get(
+    const [countRows] = await db.execute(
       `SELECT COUNT(*) AS total FROM external_labs WHERE ${where}`,
       params
     );
 
-    const enriched = rows.map(lab => {
-      const { count } = db.get(
+    const enriched = [];
+    for (const lab of rows) {
+      const [referralCountRows] = await db.execute(
         `SELECT COUNT(*) AS count FROM lab_referrals WHERE lab_id = ? AND deleted_at IS NULL`,
         [lab.id]
       );
-      return { ...lab, referral_count: count };
-    });
+      enriched.push({ ...lab, referral_count: referralCountRows[0].count });
+    }
 
-    return paginatedResponse(enriched, total, page, limit);
+    return paginatedResponse(enriched, countRows[0].total, page, limit);
   }
 
   async getLab(id, clinicId) {
-    const lab = db.get(
+    const [rows] = await db.execute(
       `SELECT * FROM external_labs WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [id, clinicId]
     );
+    const lab = rows[0];
     if (!lab) throw { statusCode: 404, message: 'Lab not found' };
 
-    const { count } = db.get(
+    const [referralCountRows] = await db.execute(
       `SELECT COUNT(*) AS count FROM lab_referrals WHERE lab_id = ? AND deleted_at IS NULL`,
       [id]
     );
 
-    return { ...lab, referral_count: count };
+    return { ...lab, referral_count: referralCountRows[0].count };
   }
 
   async createLab(clinicId, data) {
     const id = generateId();
-    db.run(
+    await db.execute(
       `INSERT INTO external_labs (id, clinic_id, name, type, contact_person, phone, whatsapp_number, email, address, city, pincode, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, clinicId, data.name, data.type || 'lab', data.contact_person || null,
-       data.phone || null, data.whatsapp_number || null, data.email || null,
-       data.address || null, data.city || null, data.pincode || null, data.notes || null]
+        data.phone || null, data.whatsapp_number || null, data.email || null,
+        data.address || null, data.city || null, data.pincode || null, data.notes || null]
     );
-    return this.getLab(id, clinicId);
+    return await this.getLab(id, clinicId);
   }
 
   async updateLab(id, clinicId, data) {
-    const existing = db.get(
+    const [existingRows] = await db.execute(
       `SELECT id FROM external_labs WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [id, clinicId]
     );
-    if (!existing) throw { statusCode: 404, message: 'Lab not found' };
+    if (!existingRows.length) throw { statusCode: 404, message: 'Lab not found' };
 
-    db.run(
+    await db.execute(
       `UPDATE external_labs SET
         name = ?, type = ?, contact_person = ?, phone = ?, whatsapp_number = ?,
         email = ?, address = ?, city = ?, pincode = ?, notes = ?, is_active = ?,
-        updated_at = datetime('now')
+        updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND clinic_id = ?`,
       [data.name, data.type || 'lab', data.contact_person || null,
-       data.phone || null, data.whatsapp_number || null, data.email || null,
-       data.address || null, data.city || null, data.pincode || null,
-       data.notes || null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
-       id, clinicId]
+      data.phone || null, data.whatsapp_number || null, data.email || null,
+      data.address || null, data.city || null, data.pincode || null,
+      data.notes || null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
+        id, clinicId]
     );
-    return this.getLab(id, clinicId);
+    return await this.getLab(id, clinicId);
   }
 
   async deleteLab(id, clinicId) {
-    const existing = db.get(
+    const [existingRows] = await db.execute(
       `SELECT id FROM external_labs WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [id, clinicId]
     );
-    if (!existing) throw { statusCode: 404, message: 'Lab not found' };
+    if (!existingRows.length) throw { statusCode: 404, message: 'Lab not found' };
 
-    db.run(
-      `UPDATE external_labs SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+    await db.execute(
+      `UPDATE external_labs SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       [id]
     );
     return { id };
   }
 
   async getAllActive(clinicId) {
-    return db.all(
+    const [rows] = await db.execute(
       `SELECT id, name, type, contact_person, phone, whatsapp_number, email, city
        FROM external_labs WHERE clinic_id = ? AND is_active = 1 AND deleted_at IS NULL
        ORDER BY name ASC`,
       [clinicId]
     );
+    return rows;
   }
 }
 

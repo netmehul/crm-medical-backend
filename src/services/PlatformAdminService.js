@@ -3,27 +3,32 @@ const { getPagination, paginatedResponse } = require('../utils/pagination');
 
 class PlatformAdminService {
   async getDashboard() {
-    const totalOrgs = db.get(
+    const [totalOrgsRow] = await db.execute(
       `SELECT COUNT(*) AS count FROM organizations WHERE deleted_at IS NULL`
-    ).count;
+    );
+    const totalOrgs = totalOrgsRow[0].count;
 
-    const suspendedOrgs = db.get(
+    const [suspendedOrgsRow] = await db.execute(
       `SELECT COUNT(*) AS count FROM organizations WHERE plan_status = 'suspended' AND deleted_at IS NULL`
-    ).count;
+    );
+    const suspendedOrgs = suspendedOrgsRow[0].count;
 
-    const totalUsers = db.get(
+    const [totalUsersRow] = await db.execute(
       `SELECT COUNT(*) AS count FROM users WHERE deleted_at IS NULL AND is_active = 1`
-    ).count;
+    );
+    const totalUsers = totalUsersRow[0].count;
 
-    const totalClinics = db.get(
+    const [totalClinicsRow] = await db.execute(
       `SELECT COUNT(*) AS count FROM clinics WHERE deleted_at IS NULL AND is_active = 1`
-    ).count;
+    );
+    const totalClinics = totalClinicsRow[0].count;
 
-    const totalPatients = db.get(
+    const [totalPatientsRow] = await db.execute(
       `SELECT COUNT(*) AS count FROM patients WHERE deleted_at IS NULL`
-    ).count;
+    );
+    const totalPatients = totalPatientsRow[0].count;
 
-    const planRows = db.all(
+    const [planRows] = await db.execute(
       `SELECT o.plan AS slug, COUNT(*) AS count,
               COALESCE(p.monthly_price_cents, 0) AS monthly_price_cents,
               COALESCE(p.name, o.plan) AS plan_name
@@ -93,7 +98,7 @@ class PlatformAdminService {
       params.push(query.status);
     }
 
-    const rows = db.all(
+    const [rows] = await db.execute(
       `SELECT o.*,
         (SELECT COUNT(*) FROM clinics c WHERE c.organization_id = o.id AND c.deleted_at IS NULL) AS branch_count,
         (SELECT COUNT(*) FROM users u WHERE u.organization_id = o.id AND u.deleted_at IS NULL) AS user_count
@@ -101,30 +106,31 @@ class PlatformAdminService {
        WHERE ${where}
        ORDER BY o.created_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+      [...params, parseInt(limit), parseInt(offset)]
     );
 
-    const { total } = db.get(
+    const [countRows] = await db.execute(
       `SELECT COUNT(*) AS total FROM organizations o WHERE ${where}`,
       params
     );
 
-    return paginatedResponse(rows, total, page, limit);
+    return paginatedResponse(rows, countRows[0].total, page, limit);
   }
 
   async getOrganization(orgId) {
-    const org = db.get(
+    const [orgRows] = await db.execute(
       `SELECT * FROM organizations WHERE id = ? AND deleted_at IS NULL`,
       [orgId]
     );
+    const org = orgRows[0];
     if (!org) throw { statusCode: 404, message: 'Organization not found' };
 
-    const clinics = db.all(
+    const [clinics] = await db.execute(
       `SELECT * FROM clinics WHERE organization_id = ? AND deleted_at IS NULL ORDER BY created_at`,
       [orgId]
     );
 
-    const users = db.all(
+    const [users] = await db.execute(
       `SELECT u.id, u.full_name, u.email, u.is_active, u.created_at
        FROM users u
        WHERE u.organization_id = ? AND u.deleted_at IS NULL
@@ -132,62 +138,65 @@ class PlatformAdminService {
       [orgId]
     );
 
-    const userBranches = {};
+    const usersWithBranches = [];
     for (const user of users) {
-      userBranches[user.id] = db.all(
+      const [memberships] = await db.execute(
         `SELECT cm.role, cm.clinic_id, c.name AS clinic_name
          FROM clinic_members cm
          JOIN clinics c ON c.id = cm.clinic_id
          WHERE cm.user_id = ? AND cm.deleted_at IS NULL AND cm.is_active = 1`,
         [user.id]
       );
+      usersWithBranches.push({ ...user, branches: memberships });
     }
 
-    const payments = db.all(
+    const [payments] = await db.execute(
       `SELECT * FROM mock_payments WHERE organization_id = ? ORDER BY activated_at DESC`,
       [orgId]
     );
 
-    const totalPatients = db.get(
+    const [patientCountRows] = await db.execute(
       `SELECT COUNT(*) AS count FROM patients p
        JOIN clinics c ON c.id = p.clinic_id
        WHERE c.organization_id = ? AND p.deleted_at IS NULL`,
       [orgId]
-    ).count;
+    );
 
     return {
       ...org,
       clinics,
-      users: users.map(u => ({ ...u, branches: userBranches[u.id] || [] })),
+      users: usersWithBranches,
       payments,
-      totalPatients,
+      totalPatients: patientCountRows[0].count,
     };
   }
 
   async updatePlan(orgId, plan) {
-    const org = db.get(`SELECT * FROM organizations WHERE id = ? AND deleted_at IS NULL`, [orgId]);
-    if (!org) throw { statusCode: 404, message: 'Organization not found' };
+    const [existing] = await db.execute(`SELECT id FROM organizations WHERE id = ? AND deleted_at IS NULL`, [orgId]);
+    if (!existing.length) throw { statusCode: 404, message: 'Organization not found' };
 
-    const now = new Date().toISOString();
-    db.run(
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    await db.execute(
       `UPDATE organizations SET plan = ?, plan_activated_at = ?, updated_at = ? WHERE id = ?`,
       [plan, now, now, orgId]
     );
 
-    return db.get(`SELECT * FROM organizations WHERE id = ?`, [orgId]);
+    const [updated] = await db.execute(`SELECT * FROM organizations WHERE id = ?`, [orgId]);
+    return updated[0];
   }
 
   async updateStatus(orgId, status) {
-    const org = db.get(`SELECT * FROM organizations WHERE id = ? AND deleted_at IS NULL`, [orgId]);
-    if (!org) throw { statusCode: 404, message: 'Organization not found' };
+    const [existing] = await db.execute(`SELECT id FROM organizations WHERE id = ? AND deleted_at IS NULL`, [orgId]);
+    if (!existing.length) throw { statusCode: 404, message: 'Organization not found' };
 
-    const now = new Date().toISOString();
-    db.run(
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    await db.execute(
       `UPDATE organizations SET plan_status = ?, updated_at = ? WHERE id = ?`,
       [status, now, orgId]
     );
 
-    return db.get(`SELECT * FROM organizations WHERE id = ?`, [orgId]);
+    const [updated] = await db.execute(`SELECT * FROM organizations WHERE id = ?`, [orgId]);
+    return updated[0];
   }
 }
 

@@ -6,7 +6,7 @@ class PrescriptionService {
   async getPrescriptions(clinicId, query) {
     const { page, limit, offset } = getPagination(query);
 
-    const rows = db.all(
+    const [rows] = await db.execute(
       `SELECT pr.*, p.full_name AS patient_name, u.full_name AS doctor_name
        FROM prescriptions pr
        LEFT JOIN patients p ON p.id = pr.patient_id AND p.deleted_at IS NULL
@@ -14,20 +14,20 @@ class PrescriptionService {
        WHERE pr.clinic_id = ? AND pr.deleted_at IS NULL
        ORDER BY pr.created_at DESC
        LIMIT ? OFFSET ?`,
-      [clinicId, limit, offset]
+      [clinicId, parseInt(limit), parseInt(offset)]
     );
 
-    const { total } = db.get(
+    const [countRows] = await db.execute(
       `SELECT COUNT(*) AS total FROM prescriptions
        WHERE clinic_id = ? AND deleted_at IS NULL`,
       [clinicId]
     );
 
-    return paginatedResponse(rows, total, page, limit);
+    return paginatedResponse(rows, countRows[0].total, page, limit);
   }
 
   async getPrescription(id, clinicId) {
-    const prescription = db.get(
+    const [rows] = await db.execute(
       `SELECT pr.*, p.full_name AS patient_name, u.full_name AS doctor_name
        FROM prescriptions pr
        LEFT JOIN patients p ON p.id = pr.patient_id AND p.deleted_at IS NULL
@@ -35,12 +35,13 @@ class PrescriptionService {
        WHERE pr.id = ? AND pr.clinic_id = ? AND pr.deleted_at IS NULL`,
       [id, clinicId]
     );
+    const prescription = rows[0];
 
     if (!prescription) {
       throw { statusCode: 404, message: 'Prescription not found' };
     }
 
-    const medications = db.all(
+    const [medications] = await db.execute(
       `SELECT * FROM prescription_medications WHERE prescription_id = ? ORDER BY sort_order`,
       [id]
     );
@@ -51,18 +52,18 @@ class PrescriptionService {
 
   async createPrescription(clinicId, data) {
     const id = generateId();
-    const now = new Date().toISOString();
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
     let fileId = data.file_id;
     if (!fileId && data.patient_id) {
-      const pf = db.get(
+      const [files] = await db.execute(
         `SELECT id FROM patient_files WHERE clinic_id = ? AND patient_id = ? AND deleted_at IS NULL`,
         [clinicId, data.patient_id]
       );
-      if (!pf) {
+      if (!files.length) {
         throw { statusCode: 400, message: 'No patient file found. Ensure the patient is registered at this clinic.' };
       }
-      fileId = pf.id;
+      fileId = files[0].id;
     }
     if (!fileId) {
       throw { statusCode: 400, message: 'file_id or patient_id is required' };
@@ -73,76 +74,101 @@ class PrescriptionService {
       throw { statusCode: 400, message: 'doctor_id is required' };
     }
 
-    db.run(
-      `INSERT INTO prescriptions
-         (id, clinic_id, patient_id, file_id, appointment_id, doctor_id, visit_date, diagnosis, notes, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id, clinicId,
-        data.patient_id,
-        fileId,
-        data.appointment_id || null,
-        doctorId,
-        data.visit_date || data.prescription_date || now.split('T')[0],
-        data.diagnosis || null, data.notes || null,
-        (data.status || 'finalized').toLowerCase(),
-        now, now,
-      ]
-    );
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
 
-    if (data.medications && data.medications.length > 0) {
-      this._insertMedications(id, data.medications);
+      await conn.execute(
+        `INSERT INTO prescriptions
+           (id, clinic_id, patient_id, file_id, appointment_id, doctor_id, visit_date, diagnosis, notes, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id, clinicId,
+          data.patient_id,
+          fileId,
+          data.appointment_id || null,
+          doctorId,
+          data.visit_date || data.prescription_date || now.split(' ')[0],
+          data.diagnosis || null, data.notes || null,
+          (data.status || 'finalized').toLowerCase(),
+          now, now,
+        ]
+      );
+
+      if (data.medications && data.medications.length > 0) {
+        await this._insertMedicationsWithConn(conn, id, data.medications);
+      }
+
+      await conn.commit();
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
     }
 
-    return this.getPrescription(id, clinicId);
+    return await this.getPrescription(id, clinicId);
   }
 
   async updatePrescription(id, clinicId, data) {
     await this.getPrescription(id, clinicId);
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-    const allowed = {};
-    const fields = ['patient_id', 'doctor_id', 'file_id', 'appointment_id', 'diagnosis', 'notes', 'visit_date', 'status'];
-    for (const f of fields) {
-      if (data[f] !== undefined) allowed[f] = data[f];
-    }
-    if (data.prescription_date !== undefined) allowed.visit_date = data.prescription_date;
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
 
-    if (Object.keys(allowed).length > 0) {
-      allowed.updated_at = new Date().toISOString();
-      const setClause = Object.keys(allowed).map(k => `${k} = ?`).join(', ');
-      const values = [...Object.values(allowed), id, clinicId];
-
-      db.run(
-        `UPDATE prescriptions SET ${setClause} WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
-        values
-      );
-    }
-
-    if (data.medications) {
-      db.run(`DELETE FROM prescription_medications WHERE prescription_id = ?`, [id]);
-      if (data.medications.length > 0) {
-        this._insertMedications(id, data.medications);
+      const allowed = {};
+      const fields = ['patient_id', 'doctor_id', 'file_id', 'appointment_id', 'diagnosis', 'notes', 'visit_date', 'status'];
+      for (const f of fields) {
+        if (data[f] !== undefined) allowed[f] = data[f];
       }
+      if (data.prescription_date !== undefined) allowed.visit_date = data.prescription_date;
+
+      if (Object.keys(allowed).length > 0) {
+        allowed.updated_at = now;
+        const setClause = Object.keys(allowed).map(k => `${k} = ?`).join(', ');
+        const values = [...Object.values(allowed), id, clinicId];
+
+        await conn.execute(
+          `UPDATE prescriptions SET ${setClause} WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
+          values
+        );
+      }
+
+      if (data.medications) {
+        await conn.execute(`DELETE FROM prescription_medications WHERE prescription_id = ?`, [id]);
+        if (data.medications.length > 0) {
+          await this._insertMedicationsWithConn(conn, id, data.medications);
+        }
+      }
+
+      await conn.commit();
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
     }
 
-    return this.getPrescription(id, clinicId);
+    return await this.getPrescription(id, clinicId);
   }
 
   async deletePrescription(id, clinicId) {
-    const result = db.run(
-      `UPDATE prescriptions SET deleted_at = datetime('now') WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
+    const [result] = await db.execute(
+      `UPDATE prescriptions SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [id, clinicId]
     );
-    if (result.changes === 0) {
+    if (result.affectedRows === 0) {
       throw { statusCode: 404, message: 'Prescription not found' };
     }
     return true;
   }
 
-  _insertMedications(prescriptionId, medications) {
+  async _insertMedicationsWithConn(conn, prescriptionId, medications) {
     for (let i = 0; i < medications.length; i++) {
       const med = medications[i];
-      db.run(
+      await conn.execute(
         `INSERT INTO prescription_medications
            (id, prescription_id, drug_name, dosage, frequency, duration, instructions, quantity, sort_order)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,

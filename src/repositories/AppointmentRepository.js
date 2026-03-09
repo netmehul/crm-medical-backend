@@ -5,8 +5,8 @@ class AppointmentRepository extends BaseRepository {
     super('appointments');
   }
 
-  findByDate(clinicId, date) {
-    const rows = this.db.all(
+  async findByDate(clinicId, date) {
+    const [rows] = await this.db.execute(
       `SELECT * FROM ${this.table}
        WHERE clinic_id = ? AND DATE(scheduled_at) = ? AND deleted_at IS NULL
        ORDER BY scheduled_at ASC`,
@@ -15,24 +15,26 @@ class AppointmentRepository extends BaseRepository {
     return rows;
   }
 
-  findByDoctor(clinicId, doctorId, { limit = 20, offset = 0 } = {}) {
-    const rows = this.db.all(
+  async findByDoctor(clinicId, doctorId, { limit = 20, offset = 0 } = {}) {
+    const [rows] = await this.db.execute(
       `SELECT * FROM ${this.table}
        WHERE clinic_id = ? AND doctor_id = ? AND deleted_at IS NULL
        ORDER BY scheduled_at DESC
        LIMIT ? OFFSET ?`,
-      [clinicId, doctorId, limit, offset]
+      [clinicId, doctorId, parseInt(limit), parseInt(offset)]
     );
-    const { total } = this.db.get(
+
+    const [countRows] = await this.db.execute(
       `SELECT COUNT(*) as total FROM ${this.table}
        WHERE clinic_id = ? AND doctor_id = ? AND deleted_at IS NULL`,
       [clinicId, doctorId]
     );
-    return { rows, total };
+
+    return { rows, total: countRows[0].total };
   }
 
-  findByPatient(patientId, clinicId) {
-    const rows = this.db.all(
+  async findByPatient(patientId, clinicId) {
+    const [rows] = await this.db.execute(
       `SELECT * FROM ${this.table}
        WHERE patient_id = ? AND clinic_id = ? AND deleted_at IS NULL
        ORDER BY scheduled_at DESC`,
@@ -41,27 +43,27 @@ class AppointmentRepository extends BaseRepository {
     return rows;
   }
 
-  findUpcoming(clinicId, { limit = 10 } = {}) {
-    const rows = this.db.all(
+  async findUpcoming(clinicId, { limit = 10 } = {}) {
+    const [rows] = await this.db.execute(
       `SELECT * FROM ${this.table}
        WHERE clinic_id = ? AND deleted_at IS NULL
-         AND status = 'scheduled' AND scheduled_at > datetime('now')
+         AND status = 'scheduled' AND scheduled_at > CURRENT_TIMESTAMP
        ORDER BY scheduled_at ASC
        LIMIT ?`,
-      [clinicId, limit]
+      [clinicId, parseInt(limit)]
     );
     return rows;
   }
 
-  countThisMonth(clinicId) {
-    const { total } = this.db.get(
+  async countThisMonth(clinicId) {
+    const [rows] = await this.db.execute(
       `SELECT COUNT(*) as total FROM ${this.table}
        WHERE clinic_id = ? AND deleted_at IS NULL
-         AND strftime('%Y', created_at) = strftime('%Y', 'now')
-         AND strftime('%m', created_at) = strftime('%m', 'now')`,
+         AND YEAR(created_at) = YEAR(CURRENT_TIMESTAMP)
+         AND MONTH(created_at) = MONTH(CURRENT_TIMESTAMP)`,
       [clinicId]
     );
-    return total;
+    return rows[0].total;
   }
 }
 

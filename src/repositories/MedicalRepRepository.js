@@ -5,27 +5,29 @@ class MedicalRepRepository extends BaseRepository {
     super('medical_reps');
   }
 
-  search(clinicId, searchTerm, { limit = 20, offset = 0 } = {}) {
+  async search(clinicId, searchTerm, { limit = 20, offset = 0 } = {}) {
     const like = `%${searchTerm}%`;
-    const rows = this.db.all(
+    const [rows] = await this.db.execute(
       `SELECT * FROM ${this.table}
        WHERE clinic_id = ? AND deleted_at IS NULL
          AND (full_name LIKE ? OR company LIKE ?)
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
-      [clinicId, like, like, limit, offset]
+      [clinicId, like, like, parseInt(limit), parseInt(offset)]
     );
-    const { total } = this.db.get(
+
+    const [countRows] = await this.db.execute(
       `SELECT COUNT(*) as total FROM ${this.table}
        WHERE clinic_id = ? AND deleted_at IS NULL
          AND (full_name LIKE ? OR company LIKE ?)`,
       [clinicId, like, like]
     );
-    return { rows, total };
+
+    return { rows, total: countRows[0].total };
   }
 
-  findWithVisits(id, clinicId) {
-    const rep = this.findById(id, clinicId);
+  async findWithVisits(id, clinicId) {
+    const rep = await this.findById(id, clinicId);
     return rep;
   }
 }

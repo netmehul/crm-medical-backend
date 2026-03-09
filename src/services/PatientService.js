@@ -12,36 +12,39 @@ class PatientService {
     return `${prefix}-${String(nextNum).padStart(4, '0')}`;
   }
 
-  _getLastPatientCode(clinicId) {
-    const row = db.get(
+  async _getLastPatientCode(clinicId) {
+    const [rows] = await db.execute(
       `SELECT patient_code FROM patients WHERE clinic_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1`,
       [clinicId]
     );
-    return row?.patient_code || null;
+    return rows[0]?.patient_code || null;
   }
 
-  _getLastFileNumber(clinicId) {
+  async _getLastFileNumber(clinicId) {
     const year = new Date().getFullYear();
-    const row = db.get(
+    const [rows] = await db.execute(
       `SELECT file_number FROM patient_files
        WHERE clinic_id = ? AND deleted_at IS NULL AND file_number LIKE ?
        ORDER BY created_at DESC LIMIT 1`,
       [clinicId, `FILE-${year}-%`]
     );
-    return row?.file_number || null;
+    return rows[0]?.file_number || null;
   }
 
   async createPatient(clinicId, userId, data) {
-    const patientCode = this._generateCode(this._getLastPatientCode(clinicId), 'PAT');
+    const patientCode = this._generateCode(await this._getLastPatientCode(clinicId), 'PAT');
     const year = new Date().getFullYear();
-    const fileNumber = this._generateCode(this._getLastFileNumber(clinicId), `FILE-${year}`);
+    const fileNumber = this._generateCode(await this._getLastFileNumber(clinicId), `FILE-${year}`);
 
     const patientId = generateId();
     const fileId = generateId();
-    const now = new Date().toISOString();
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-    const txn = db.transaction(() => {
-      db.run(
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      await conn.execute(
         `INSERT INTO patients
            (id, clinic_id, patient_code, full_name, date_of_birth, age, gender, blood_group,
             phone, email, address, allergies, chronic_conditions, created_by, created_at, updated_at)
@@ -56,19 +59,25 @@ class PatientService {
         ]
       );
 
-      db.run(
+      await conn.execute(
         `INSERT INTO patient_files (id, clinic_id, patient_id, file_number, assigned_doctor, status, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, 'active', ?, ?)`,
         [fileId, clinicId, patientId, fileNumber, data.assigned_doctor || null, now, now]
       );
-    });
-    txn();
 
-    return this._getPatientWithFile(patientId, clinicId);
+      await conn.commit();
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
+    }
+
+    return await this._getPatientWithFile(patientId, clinicId);
   }
 
-  _getPatientWithFile(patientId, clinicId) {
-    return db.get(
+  async _getPatientWithFile(patientId, clinicId) {
+    const [rows] = await db.execute(
       `SELECT p.*,
         pf.id AS file_id, pf.file_number, pf.assigned_doctor,
         pf.status AS file_status, pf.last_visit_at, pf.next_followup_at,
@@ -79,6 +88,7 @@ class PatientService {
        WHERE p.id = ? AND p.clinic_id = ? AND p.deleted_at IS NULL`,
       [patientId, clinicId]
     );
+    return rows[0] || null;
   }
 
   async getPatients(clinicId, query) {
@@ -93,7 +103,7 @@ class PatientService {
       params.push(like, like, like);
     }
 
-    const rows = db.all(
+    const [rows] = await db.execute(
       `SELECT p.*,
         pf.id AS file_id, pf.file_number, pf.assigned_doctor,
         pf.status AS file_status, pf.last_visit_at, pf.next_followup_at,
@@ -104,52 +114,53 @@ class PatientService {
        WHERE ${where}
        ORDER BY p.created_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+      [...params, parseInt(limit), parseInt(offset)]
     );
 
-    const { total } = db.get(
+    const [countRows] = await db.execute(
       `SELECT COUNT(*) AS total FROM patients p WHERE ${where}`,
       params
     );
 
-    return paginatedResponse(rows, total, page, limit);
+    return paginatedResponse(rows, countRows[0].total, page, limit);
   }
 
   async getPatient(patientId, clinicId) {
-    const patient = this._getPatientWithFile(patientId, clinicId);
+    const patient = await this._getPatientWithFile(patientId, clinicId);
     if (!patient) throw { statusCode: 404, message: 'Patient not found' };
     return patient;
   }
 
   async updatePatient(patientId, clinicId, data) {
-    const existing = db.get(
+    const [existingRows] = await db.execute(
       `SELECT * FROM patients WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [patientId, clinicId]
     );
+    const existing = existingRows[0];
     if (!existing) throw { statusCode: 404, message: 'Patient not found' };
 
     const allowed = {};
     for (const f of ['full_name', 'date_of_birth', 'age', 'gender', 'blood_group', 'phone', 'email', 'address', 'allergies', 'chronic_conditions']) {
       if (data[f] !== undefined) allowed[f] = data[f];
     }
-    if (Object.keys(allowed).length === 0) return this.getPatient(patientId, clinicId);
+    if (Object.keys(allowed).length === 0) return await this.getPatient(patientId, clinicId);
 
-    allowed.updated_at = new Date().toISOString();
+    allowed.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
     const setClause = Object.keys(allowed).map(k => `${k} = ?`).join(', ');
-    db.run(
+    await db.execute(
       `UPDATE patients SET ${setClause} WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [...Object.values(allowed), patientId, clinicId]
     );
 
-    return this.getPatient(patientId, clinicId);
+    return await this.getPatient(patientId, clinicId);
   }
 
   async deletePatient(patientId, clinicId) {
-    const result = db.run(
-      `UPDATE patients SET deleted_at = datetime('now') WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
+    const [result] = await db.execute(
+      `UPDATE patients SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [patientId, clinicId]
     );
-    if (result.changes === 0) throw { statusCode: 404, message: 'Patient not found' };
+    if (result.affectedRows === 0) throw { statusCode: 404, message: 'Patient not found' };
     return true;
   }
 }

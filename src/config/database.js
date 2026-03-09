@@ -1,18 +1,21 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+const mysql = require('mysql2/promise')
 
-const dbPath = process.env.DB_PATH || path.join(__dirname, '../../data/medicrm.db');
-const db = new Database(dbPath);
+const pool = mysql.createPool({
+  uri: process.env.DATABASE_URL,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+})
 
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+// Test connection on startup
+pool.getConnection()
+  .then(conn => {
+    console.log('✅  MySQL connected')
+    conn.release()
+  })
+  .catch(err => {
+    console.error('❌  MySQL connection failed:', err.message)
+    process.exit(1)
+  })
 
-module.exports = {
-  get:         (sql, params = []) => db.prepare(sql).get(...params),
-  all:         (sql, params = []) => db.prepare(sql).all(...params),
-  run:         (sql, params = []) => db.prepare(sql).run(...params),
-  exec:        (sql) => db.exec(sql),
-  transaction: (fn) => db.transaction(fn),
-  close:       () => db.close(),
-  raw:         db,
-};
+module.exports = pool

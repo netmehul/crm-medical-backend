@@ -6,16 +6,15 @@ class ReportRepository extends BaseRepository {
     super('patient_reports');
   }
 
-  create(data) {
+  async create(data) {
     const id = generateId();
-    const now = new Date().toISOString();
-    const record = { id, ...data, created_at: now };
+    const record = { id, ...data }; // timestamps handled by MySQL DEFAULT CURRENT_TIMESTAMP
 
     const columns = Object.keys(record).join(', ');
     const placeholders = Object.keys(record).map(() => '?').join(', ');
     const values = Object.values(record);
 
-    this.db.run(
+    await this.db.execute(
       `INSERT INTO ${this.table} (${columns}) VALUES (${placeholders})`,
       values
     );
@@ -23,20 +22,22 @@ class ReportRepository extends BaseRepository {
     return this.findById(id);
   }
 
-  findByPatient(patientId, clinicId, { limit = 20, offset = 0 } = {}) {
-    const rows = this.db.all(
+  async findByPatient(patientId, clinicId, { limit = 20, offset = 0 } = {}) {
+    const [rows] = await this.db.execute(
       `SELECT * FROM ${this.table}
        WHERE patient_id = ? AND clinic_id = ? AND deleted_at IS NULL
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
-      [patientId, clinicId, limit, offset]
+      [patientId, clinicId, parseInt(limit), parseInt(offset)]
     );
-    const { total } = this.db.get(
+
+    const [countRows] = await this.db.execute(
       `SELECT COUNT(*) as total FROM ${this.table}
        WHERE patient_id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [patientId, clinicId]
     );
-    return { rows, total };
+
+    return { rows, total: countRows[0].total };
   }
 }
 

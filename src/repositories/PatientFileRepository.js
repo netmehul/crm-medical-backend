@@ -5,40 +5,40 @@ class PatientFileRepository extends BaseRepository {
     super('patient_files');
   }
 
-  findByPatientId(patientId, clinicId) {
-    const row = this.db.get(
+  async findByPatientId(patientId, clinicId) {
+    const [rows] = await this.db.execute(
       `SELECT * FROM ${this.table}
        WHERE patient_id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [patientId, clinicId]
     );
-    return row || null;
+    return rows[0] || null;
   }
 
-  getLastFileNumber(clinicId) {
-    const row = this.db.get(
+  async getLastFileNumber(clinicId) {
+    const [rows] = await this.db.execute(
       `SELECT file_number FROM ${this.table}
        WHERE clinic_id = ? AND deleted_at IS NULL
        ORDER BY created_at DESC
        LIMIT 1`,
       [clinicId]
     );
-    return row ? row.file_number : null;
+    return rows[0] ? rows[0].file_number : null;
   }
 
-  updateLastVisit(fileId, clinicId) {
-    this.db.run(
+  async updateLastVisit(fileId, clinicId) {
+    await this.db.execute(
       `UPDATE ${this.table}
-       SET last_visit_at = datetime('now'), updated_at = datetime('now')
+       SET last_visit_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [fileId, clinicId]
     );
     return this.findById(fileId, clinicId);
   }
 
-  updateFollowUp(fileId, clinicId, date) {
-    this.db.run(
+  async updateFollowUp(fileId, clinicId, date) {
+    await this.db.execute(
       `UPDATE ${this.table}
-       SET next_followup_at = ?, updated_at = datetime('now')
+       SET next_followup_at = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [date, fileId, clinicId]
     );

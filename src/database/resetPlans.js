@@ -4,7 +4,17 @@
 require('dotenv').config();
 const db = require('../config/database');
 
-db.run('DELETE FROM plan_limits');
-db.run('DELETE FROM plan_modules');
-db.run('DELETE FROM plans');
-console.log('✅ Plans tables cleared. Restart the server to re-seed.');
+async function resetPlans() {
+    try {
+        await db.execute('DELETE FROM plan_limits');
+        await db.execute('DELETE FROM plan_modules');
+        await db.execute('DELETE FROM plans');
+        console.log('✅ Plans tables cleared. Restart the server to re-seed.');
+        process.exit(0);
+    } catch (err) {
+        console.error('❌ Reset failed:', err.message);
+        process.exit(1);
+    }
+}
+
+resetPlans();

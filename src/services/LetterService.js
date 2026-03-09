@@ -1,6 +1,6 @@
 const path = require('path');
-const fs   = require('fs');
-const db   = require('../config/database');
+const fs = require('fs');
+const db = require('../config/database');
 
 class LetterService {
 
@@ -18,8 +18,8 @@ class LetterService {
     ).join('');
 
     const urgencyBadge = {
-      routine:   { label: 'Routine',   color: '#059669' },
-      urgent:    { label: 'Urgent',    color: '#D97706' },
+      routine: { label: 'Routine', color: '#059669' },
+      urgent: { label: 'Urgent', color: '#D97706' },
       emergency: { label: 'Emergency', color: '#DC2626' },
     }[referral.urgency] || { label: 'Routine', color: '#059669' };
 
@@ -62,7 +62,7 @@ class LetterService {
     .signature-line { border-bottom: 1px solid #1a1a2e; margin-bottom: 6px; height: 40px; }
     .signature-name { font-size: 13px; font-weight: 700; color: #1a1a2e; }
     .signature-title { font-size: 11px; color: #6b7280; }
-    .footer { margin-top: 40px; padding: 16px 40px; background: #f9fafb; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
+    .footer { margin-top: 40px; padding: 16px 40px; background: #f9fafb; border-top: 1px solid #e5e7eb; display: justify-content; align-items: center; }
     .footer-text { font-size: 10px; color: #9ca3af; }
     .footer-ref { font-size: 10px; color: #9ca3af; font-family: 'Courier New', monospace; }
   </style>
@@ -138,31 +138,28 @@ class LetterService {
   }
 
   async generateReferralLetter(referralId) {
-    const referral = db.get(
-      `SELECT * FROM lab_referrals WHERE id = ?`, [referralId]
-    );
+    const [referralRows] = await db.execute(`SELECT * FROM lab_referrals WHERE id = ?`, [referralId]);
+    const referral = referralRows[0];
     if (!referral) throw { statusCode: 404, message: 'Referral not found' };
 
-    const patient = db.get(`SELECT * FROM patients WHERE id = ?`, [referral.patient_id]);
-    const lab     = db.get(`SELECT * FROM external_labs WHERE id = ?`, [referral.lab_id]);
-    const doctor  = db.get(`SELECT * FROM users WHERE id = ?`, [referral.referred_by]);
-    const clinic  = db.get(`SELECT * FROM clinics WHERE id = ?`, [referral.clinic_id]);
-    const tests   = db.all(
-      `SELECT * FROM referral_tests WHERE referral_id = ? ORDER BY sort_order ASC`, [referralId]
-    );
+    const [patientRows] = await db.execute(`SELECT * FROM patients WHERE id = ?`, [referral.patient_id]);
+    const [labRows] = await db.execute(`SELECT * FROM external_labs WHERE id = ?`, [referral.lab_id]);
+    const [doctorRows] = await db.execute(`SELECT * FROM users WHERE id = ?`, [referral.referred_by]);
+    const [clinicRows] = await db.execute(`SELECT * FROM clinics WHERE id = ?`, [referral.clinic_id]);
+    const [testRows] = await db.execute(`SELECT * FROM referral_tests WHERE referral_id = ? ORDER BY sort_order ASC`, [referralId]);
 
-    const html = this._buildLetterHTML(referral, clinic || {}, patient, lab, doctor, tests);
+    const html = this._buildLetterHTML(referral, clinicRows[0] || {}, patientRows[0], labRows[0], doctorRows[0], testRows);
 
     const uploadDir = path.join(__dirname, '../../public/uploads', `clinic_${referral.clinic_id}`, 'referrals');
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-    const fileName   = `referral_${referral.reference_number.replace(/\//g, '-')}.html`;
+    const fileName = `referral_${referral.reference_number.replace(/\//g, '-')}.html`;
     const outputPath = path.join(uploadDir, fileName);
 
     fs.writeFileSync(outputPath, html, 'utf-8');
 
-    db.run(
-      `UPDATE lab_referrals SET letter_path = ?, letter_generated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+    await db.execute(
+      `UPDATE lab_referrals SET letter_path = ?, letter_generated_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       [outputPath, referralId]
     );
 

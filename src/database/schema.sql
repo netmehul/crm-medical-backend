@@ -1,53 +1,55 @@
--- MediCRM SQLite Schema — 4-Tier Architecture
--- All IDs are TEXT (UUID). All tables use deleted_at for soft delete.
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- MediCRM MySQL Schema
+-- All IDs are VARCHAR(36) (UUID). All tables use deleted_at for soft delete.
 
 -- ─────────────────────────────────────────
 -- TIER 1: PLATFORM ADMINS
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS platform_admins (
-  id            TEXT PRIMARY KEY,
-  full_name     TEXT NOT NULL,
-  email         TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
+  id            VARCHAR(36) PRIMARY KEY,
+  full_name     VARCHAR(255) NOT NULL,
+  email         VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
   is_active     INTEGER DEFAULT 1,
-  deleted_at    TEXT DEFAULT NULL,
-  created_at    TEXT DEFAULT (datetime('now')),
-  updated_at    TEXT DEFAULT (datetime('now'))
+  deleted_at    DATETIME DEFAULT NULL,
+  created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ─────────────────────────────────────────
 -- TIER 2: ORGANIZATIONS
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS organizations (
-  id                TEXT PRIMARY KEY,
-  name              TEXT NOT NULL,
-  owner_email       TEXT NOT NULL UNIQUE,
-  phone             TEXT,
-  address           TEXT,
-  plan              TEXT DEFAULT 'free',
-  plan_status       TEXT DEFAULT 'active',
-  plan_activated_at TEXT,
-  mock_customer_id  TEXT,
-  deleted_at        TEXT DEFAULT NULL,
-  created_at        TEXT DEFAULT (datetime('now')),
-  updated_at        TEXT DEFAULT (datetime('now'))
+  id                VARCHAR(36) PRIMARY KEY,
+  name              VARCHAR(255) NOT NULL,
+  owner_email       VARCHAR(255) NOT NULL UNIQUE,
+  phone             VARCHAR(255),
+  address           VARCHAR(255),
+  plan              VARCHAR(255) DEFAULT 'free',
+  plan_status       VARCHAR(255) DEFAULT 'active',
+  plan_activated_at VARCHAR(255),
+  mock_customer_id  VARCHAR(255),
+  deleted_at        DATETIME DEFAULT NULL,
+  created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ─────────────────────────────────────────
 -- TIER 3: CLINICS / BRANCHES
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS clinics (
-  id              TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  name            TEXT NOT NULL,
-  phone           TEXT,
-  email           TEXT,
-  address         TEXT,
-  city            TEXT,
+  id              VARCHAR(36) PRIMARY KEY,
+  organization_id VARCHAR(36) NOT NULL,
+  name            VARCHAR(255) NOT NULL,
+  phone           VARCHAR(255),
+  email           VARCHAR(255),
+  address         VARCHAR(255),
+  city            VARCHAR(255),
   is_active       INTEGER DEFAULT 1,
-  deleted_at      TEXT DEFAULT NULL,
-  created_at      TEXT DEFAULT (datetime('now')),
-  updated_at      TEXT DEFAULT (datetime('now')),
+  deleted_at      DATETIME DEFAULT NULL,
+  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (organization_id) REFERENCES organizations(id)
 );
 
@@ -55,28 +57,28 @@ CREATE TABLE IF NOT EXISTS clinics (
 -- TIER 4: USERS
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
-  id              TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  full_name       TEXT NOT NULL,
-  email           TEXT NOT NULL UNIQUE,
-  password_hash   TEXT NOT NULL,
+  id              VARCHAR(36) PRIMARY KEY,
+  organization_id VARCHAR(36) NOT NULL,
+  full_name       VARCHAR(255) NOT NULL,
+  email           VARCHAR(255) NOT NULL UNIQUE,
+  password_hash   VARCHAR(255) NOT NULL,
   is_active       INTEGER DEFAULT 1,
-  deleted_at      TEXT DEFAULT NULL,
-  created_at      TEXT DEFAULT (datetime('now')),
-  updated_at      TEXT DEFAULT (datetime('now')),
+  deleted_at      DATETIME DEFAULT NULL,
+  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (organization_id) REFERENCES organizations(id)
 );
 
 -- Maps users to clinic branches with their role at each branch
 CREATE TABLE IF NOT EXISTS clinic_members (
-  id              TEXT PRIMARY KEY,
-  user_id         TEXT NOT NULL,
-  clinic_id       TEXT NOT NULL,
-  organization_id TEXT NOT NULL,
-  role            TEXT NOT NULL,
+  id              VARCHAR(36) PRIMARY KEY,
+  user_id         VARCHAR(36) NOT NULL,
+  clinic_id       VARCHAR(36) NOT NULL,
+  organization_id VARCHAR(36) NOT NULL,
+  role            VARCHAR(255) NOT NULL,
   is_active       INTEGER DEFAULT 1,
-  deleted_at      TEXT DEFAULT NULL,
-  created_at      TEXT DEFAULT (datetime('now')),
+  deleted_at      DATETIME DEFAULT NULL,
+  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id)         REFERENCES users(id),
   FOREIGN KEY (clinic_id)       REFERENCES clinics(id),
   FOREIGN KEY (organization_id) REFERENCES organizations(id),
@@ -87,23 +89,23 @@ CREATE TABLE IF NOT EXISTS clinic_members (
 -- PATIENTS
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS patients (
-  id                 TEXT PRIMARY KEY,
-  clinic_id          TEXT NOT NULL,
-  patient_code       TEXT,
-  full_name          TEXT NOT NULL,
-  date_of_birth      TEXT,
+  id                 VARCHAR(36) PRIMARY KEY,
+  clinic_id          VARCHAR(36) NOT NULL,
+  patient_code       VARCHAR(255),
+  full_name          VARCHAR(255) NOT NULL,
+  date_of_birth      VARCHAR(255),
   age                INTEGER,
-  gender             TEXT,
-  blood_group        TEXT,
-  phone              TEXT,
-  email              TEXT,
-  address            TEXT,
+  gender             VARCHAR(255),
+  blood_group        VARCHAR(255),
+  phone              VARCHAR(255),
+  email              VARCHAR(255),
+  address            VARCHAR(255),
   allergies          TEXT,
   chronic_conditions TEXT,
-  created_by         TEXT,
-  deleted_at         TEXT DEFAULT NULL,
-  created_at         TEXT DEFAULT (datetime('now')),
-  updated_at         TEXT DEFAULT (datetime('now')),
+  created_by         VARCHAR(36),
+  deleted_at         DATETIME DEFAULT NULL,
+  created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id)  REFERENCES clinics(id),
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
@@ -112,17 +114,17 @@ CREATE TABLE IF NOT EXISTS patients (
 -- PATIENT FILES
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS patient_files (
-  id                 TEXT PRIMARY KEY,
-  clinic_id          TEXT NOT NULL,
-  patient_id         TEXT NOT NULL UNIQUE,
-  file_number        TEXT,
-  assigned_doctor    TEXT,
-  status             TEXT DEFAULT 'active',
-  last_visit_at      TEXT,
-  next_followup_at   TEXT,
-  deleted_at         TEXT DEFAULT NULL,
-  created_at         TEXT DEFAULT (datetime('now')),
-  updated_at         TEXT DEFAULT (datetime('now')),
+  id                 VARCHAR(36) PRIMARY KEY,
+  clinic_id          VARCHAR(36) NOT NULL,
+  patient_id         VARCHAR(36) NOT NULL UNIQUE,
+  file_number        VARCHAR(255),
+  assigned_doctor    VARCHAR(36),
+  status             VARCHAR(255) DEFAULT 'active',
+  last_visit_at      VARCHAR(255),
+  next_followup_at   VARCHAR(255),
+  deleted_at         DATETIME DEFAULT NULL,
+  created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id)  REFERENCES clinics(id),
   FOREIGN KEY (patient_id) REFERENCES patients(id)
 );
@@ -131,21 +133,21 @@ CREATE TABLE IF NOT EXISTS patient_files (
 -- PATIENT REPORTS (Pro only)
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS patient_reports (
-  id           TEXT PRIMARY KEY,
-  clinic_id    TEXT NOT NULL,
-  patient_id   TEXT NOT NULL,
-  file_id      TEXT NOT NULL,
-  report_name  TEXT NOT NULL,
-  report_type  TEXT DEFAULT 'other',
-  file_path    TEXT,
-  file_name    TEXT,
-  file_type    TEXT,
+  id           VARCHAR(36) PRIMARY KEY,
+  clinic_id    VARCHAR(36) NOT NULL,
+  patient_id   VARCHAR(36) NOT NULL,
+  file_id      VARCHAR(36) NOT NULL,
+  report_name  VARCHAR(255) NOT NULL,
+  report_type  VARCHAR(255) DEFAULT 'other',
+  file_path    VARCHAR(255),
+  file_name    VARCHAR(255),
+  file_type    VARCHAR(255),
   file_size_kb INTEGER,
-  report_date  TEXT,
+  report_date  VARCHAR(255),
   notes        TEXT,
-  uploaded_by  TEXT,
-  deleted_at   TEXT DEFAULT NULL,
-  created_at   TEXT DEFAULT (datetime('now')),
+  uploaded_by  VARCHAR(36),
+  deleted_at   DATETIME DEFAULT NULL,
+  created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id)   REFERENCES clinics(id),
   FOREIGN KEY (patient_id)  REFERENCES patients(id),
   FOREIGN KEY (file_id)     REFERENCES patient_files(id),
@@ -156,19 +158,19 @@ CREATE TABLE IF NOT EXISTS patient_reports (
 -- PATIENT NOTES
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS patient_notes (
-  id         TEXT PRIMARY KEY,
-  clinic_id  TEXT NOT NULL,
-  patient_id TEXT NOT NULL,
-  file_id    TEXT NOT NULL,
-  note_type  TEXT DEFAULT 'visit_note',
-  title      TEXT,
+  id         VARCHAR(36) PRIMARY KEY,
+  clinic_id  VARCHAR(36) NOT NULL,
+  patient_id VARCHAR(36) NOT NULL,
+  file_id    VARCHAR(36) NOT NULL,
+  note_type  VARCHAR(255) DEFAULT 'visit_note',
+  title      VARCHAR(255),
   content    TEXT NOT NULL,
-  visit_date TEXT,
+  visit_date VARCHAR(255),
   is_private INTEGER DEFAULT 0,
-  created_by TEXT NOT NULL,
-  deleted_at TEXT DEFAULT NULL,
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now')),
+  created_by VARCHAR(36) NOT NULL,
+  deleted_at DATETIME DEFAULT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id)  REFERENCES clinics(id),
   FOREIGN KEY (patient_id) REFERENCES patients(id),
   FOREIGN KEY (file_id)    REFERENCES patient_files(id),
@@ -179,21 +181,21 @@ CREATE TABLE IF NOT EXISTS patient_notes (
 -- APPOINTMENTS
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS appointments (
-  id             TEXT PRIMARY KEY,
-  clinic_id      TEXT NOT NULL,
-  patient_id     TEXT NOT NULL,
-  doctor_id      TEXT NOT NULL,
-  file_id        TEXT,
-  scheduled_at   TEXT NOT NULL,
+  id             VARCHAR(36) PRIMARY KEY,
+  clinic_id      VARCHAR(36) NOT NULL,
+  patient_id     VARCHAR(36) NOT NULL,
+  doctor_id      VARCHAR(36) NOT NULL,
+  file_id        VARCHAR(36),
+  scheduled_at   VARCHAR(255) NOT NULL,
   duration_mins  INTEGER DEFAULT 30,
-  type           TEXT DEFAULT 'general',
-  status         TEXT DEFAULT 'scheduled',
-  reason         TEXT,
+  type           VARCHAR(255) DEFAULT 'general',
+  status         VARCHAR(255) DEFAULT 'scheduled',
+  reason         VARCHAR(255),
   notes          TEXT,
-  created_by     TEXT,
-  deleted_at     TEXT DEFAULT NULL,
-  created_at     TEXT DEFAULT (datetime('now')),
-  updated_at     TEXT DEFAULT (datetime('now')),
+  created_by     VARCHAR(36),
+  deleted_at     DATETIME DEFAULT NULL,
+  created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id)  REFERENCES clinics(id),
   FOREIGN KEY (patient_id) REFERENCES patients(id),
   FOREIGN KEY (doctor_id)  REFERENCES users(id),
@@ -204,19 +206,19 @@ CREATE TABLE IF NOT EXISTS appointments (
 -- PRESCRIPTIONS
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS prescriptions (
-  id             TEXT PRIMARY KEY,
-  clinic_id      TEXT NOT NULL,
-  patient_id     TEXT NOT NULL,
-  file_id        TEXT NOT NULL,
-  appointment_id TEXT,
-  doctor_id      TEXT NOT NULL,
-  visit_date     TEXT NOT NULL,
+  id             VARCHAR(36) PRIMARY KEY,
+  clinic_id      VARCHAR(36) NOT NULL,
+  patient_id     VARCHAR(36) NOT NULL,
+  file_id        VARCHAR(36) NOT NULL,
+  appointment_id VARCHAR(36),
+  doctor_id      VARCHAR(36) NOT NULL,
+  visit_date     VARCHAR(255) NOT NULL,
   diagnosis      TEXT,
   notes          TEXT,
-  status         TEXT DEFAULT 'finalized',
-  deleted_at     TEXT DEFAULT NULL,
-  created_at     TEXT DEFAULT (datetime('now')),
-  updated_at     TEXT DEFAULT (datetime('now')),
+  status         VARCHAR(255) DEFAULT 'finalized',
+  deleted_at     DATETIME DEFAULT NULL,
+  created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id)      REFERENCES clinics(id),
   FOREIGN KEY (patient_id)     REFERENCES patients(id),
   FOREIGN KEY (file_id)        REFERENCES patient_files(id),
@@ -225,14 +227,14 @@ CREATE TABLE IF NOT EXISTS prescriptions (
 );
 
 CREATE TABLE IF NOT EXISTS prescription_medications (
-  id              TEXT PRIMARY KEY,
-  prescription_id TEXT NOT NULL,
-  drug_name       TEXT NOT NULL,
-  dosage          TEXT,
-  frequency       TEXT,
-  duration        TEXT,
+  id              VARCHAR(36) PRIMARY KEY,
+  prescription_id VARCHAR(36) NOT NULL,
+  drug_name       VARCHAR(255) NOT NULL,
+  dosage          VARCHAR(255),
+  frequency       VARCHAR(255),
+  duration        VARCHAR(255),
   instructions    TEXT,
-  quantity        TEXT,
+  quantity        VARCHAR(255),
   sort_order      INTEGER DEFAULT 0,
   FOREIGN KEY (prescription_id) REFERENCES prescriptions(id) ON DELETE CASCADE
 );
@@ -241,29 +243,29 @@ CREATE TABLE IF NOT EXISTS prescription_medications (
 -- BILLING (Pro only)
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS patient_billing (
-  id              TEXT PRIMARY KEY,
-  clinic_id       TEXT NOT NULL,
-  patient_id      TEXT NOT NULL,
-  file_id         TEXT NOT NULL,
-  appointment_id  TEXT,
-  invoice_number  TEXT,
-  invoice_date    TEXT NOT NULL,
-  due_date        TEXT,
+  id              VARCHAR(36) PRIMARY KEY,
+  clinic_id       VARCHAR(36) NOT NULL,
+  patient_id      VARCHAR(36) NOT NULL,
+  file_id         VARCHAR(36) NOT NULL,
+  appointment_id  VARCHAR(36),
+  invoice_number  VARCHAR(255),
+  invoice_date    VARCHAR(255) NOT NULL,
+  due_date        VARCHAR(255),
   line_items      TEXT,
   subtotal        REAL DEFAULT 0,
   tax_percent     REAL DEFAULT 0,
   tax_amount      REAL DEFAULT 0,
   discount_amount REAL DEFAULT 0,
   total_amount    REAL NOT NULL,
-  payment_status  TEXT DEFAULT 'draft',
-  payment_method  TEXT,
+  payment_status  VARCHAR(255) DEFAULT 'draft',
+  payment_method  VARCHAR(255),
   paid_amount     REAL DEFAULT 0,
-  paid_at         TEXT,
+  paid_at         VARCHAR(255),
   notes           TEXT,
-  created_by      TEXT,
-  deleted_at      TEXT DEFAULT NULL,
-  created_at      TEXT DEFAULT (datetime('now')),
-  updated_at      TEXT DEFAULT (datetime('now')),
+  created_by      VARCHAR(36),
+  deleted_at      DATETIME DEFAULT NULL,
+  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id)      REFERENCES clinics(id),
   FOREIGN KEY (patient_id)     REFERENCES patients(id),
   FOREIGN KEY (file_id)        REFERENCES patient_files(id),
@@ -274,29 +276,29 @@ CREATE TABLE IF NOT EXISTS patient_billing (
 -- INVENTORY (Pro only)
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS inventory (
-  id                  TEXT PRIMARY KEY,
-  clinic_id           TEXT NOT NULL,
-  item_name           TEXT NOT NULL,
-  category            TEXT DEFAULT 'other',
+  id                  VARCHAR(36) PRIMARY KEY,
+  clinic_id           VARCHAR(36) NOT NULL,
+  item_name           VARCHAR(255) NOT NULL,
+  category            VARCHAR(255) DEFAULT 'other',
   quantity            INTEGER DEFAULT 0,
-  unit                TEXT,
+  unit                VARCHAR(255),
   low_stock_threshold INTEGER DEFAULT 10,
   notes               TEXT,
-  deleted_at          TEXT DEFAULT NULL,
-  created_at          TEXT DEFAULT (datetime('now')),
-  updated_at          TEXT DEFAULT (datetime('now')),
+  deleted_at          DATETIME DEFAULT NULL,
+  created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id) REFERENCES clinics(id)
 );
 
 CREATE TABLE IF NOT EXISTS inventory_transactions (
-  id           TEXT PRIMARY KEY,
-  clinic_id    TEXT NOT NULL,
-  inventory_id TEXT NOT NULL,
-  type         TEXT NOT NULL,
+  id           VARCHAR(36) PRIMARY KEY,
+  clinic_id    VARCHAR(36) NOT NULL,
+  inventory_id VARCHAR(36) NOT NULL,
+  type         VARCHAR(255) NOT NULL,
   quantity     INTEGER NOT NULL,
-  reason       TEXT,
-  performed_by TEXT,
-  created_at   TEXT DEFAULT (datetime('now')),
+  reason       VARCHAR(255),
+  performed_by VARCHAR(36),
+  created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id)    REFERENCES clinics(id),
   FOREIGN KEY (inventory_id) REFERENCES inventory(id),
   FOREIGN KEY (performed_by) REFERENCES users(id)
@@ -306,43 +308,43 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
 -- MEDICAL REPS (Pro only)
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS medical_reps (
-  id        TEXT PRIMARY KEY,
-  clinic_id TEXT NOT NULL,
-  full_name TEXT NOT NULL,
-  company   TEXT,
-  phone     TEXT,
-  email     TEXT,
+  id        VARCHAR(36) PRIMARY KEY,
+  clinic_id VARCHAR(36) NOT NULL,
+  full_name VARCHAR(255) NOT NULL,
+  company   VARCHAR(255),
+  phone     VARCHAR(255),
+  email     VARCHAR(255),
   notes     TEXT,
-  deleted_at TEXT DEFAULT NULL,
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now')),
+  deleted_at DATETIME DEFAULT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id) REFERENCES clinics(id)
 );
 
 CREATE TABLE IF NOT EXISTS mr_visits (
-  id        TEXT PRIMARY KEY,
-  clinic_id TEXT NOT NULL,
-  mr_id     TEXT NOT NULL,
-  visit_date TEXT NOT NULL,
-  purpose   TEXT DEFAULT 'other',
+  id        VARCHAR(36) PRIMARY KEY,
+  clinic_id VARCHAR(36) NOT NULL,
+  mr_id     VARCHAR(36) NOT NULL,
+  visit_date VARCHAR(255) NOT NULL,
+  purpose   VARCHAR(255) DEFAULT 'other',
   notes     TEXT,
-  logged_by TEXT,
-  deleted_at TEXT DEFAULT NULL,
-  created_at TEXT DEFAULT (datetime('now')),
+  logged_by VARCHAR(36),
+  deleted_at DATETIME DEFAULT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id) REFERENCES clinics(id),
   FOREIGN KEY (mr_id)     REFERENCES medical_reps(id),
   FOREIGN KEY (logged_by) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS mr_products (
-  id           TEXT PRIMARY KEY,
-  clinic_id    TEXT NOT NULL,
-  mr_id        TEXT NOT NULL,
-  product_name TEXT NOT NULL,
-  category     TEXT,
+  id           VARCHAR(36) PRIMARY KEY,
+  clinic_id    VARCHAR(36) NOT NULL,
+  mr_id        VARCHAR(36) NOT NULL,
+  product_name VARCHAR(255) NOT NULL,
+  category     VARCHAR(255),
   notes        TEXT,
-  deleted_at   TEXT DEFAULT NULL,
-  created_at   TEXT DEFAULT (datetime('now')),
+  deleted_at   DATETIME DEFAULT NULL,
+  created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id) REFERENCES clinics(id),
   FOREIGN KEY (mr_id)     REFERENCES medical_reps(id)
 );
@@ -351,47 +353,47 @@ CREATE TABLE IF NOT EXISTS mr_products (
 -- EXTERNAL LABS & REFERRALS
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS external_labs (
-  id              TEXT PRIMARY KEY,
-  clinic_id       TEXT NOT NULL,
-  name            TEXT NOT NULL,
-  type            TEXT DEFAULT 'lab',
-  contact_person  TEXT,
-  phone           TEXT,
-  whatsapp_number TEXT,
-  email           TEXT,
-  address         TEXT,
-  city            TEXT,
-  pincode         TEXT,
+  id              VARCHAR(36) PRIMARY KEY,
+  clinic_id       VARCHAR(36) NOT NULL,
+  name            VARCHAR(255) NOT NULL,
+  type            VARCHAR(255) DEFAULT 'lab',
+  contact_person  VARCHAR(255),
+  phone           VARCHAR(255),
+  whatsapp_number VARCHAR(255),
+  email           VARCHAR(255),
+  address         VARCHAR(255),
+  city            VARCHAR(255),
+  pincode         VARCHAR(255),
   notes           TEXT,
   is_active       INTEGER DEFAULT 1,
-  deleted_at      TEXT DEFAULT NULL,
-  created_at      TEXT DEFAULT (datetime('now')),
-  updated_at      TEXT DEFAULT (datetime('now')),
+  deleted_at      DATETIME DEFAULT NULL,
+  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id) REFERENCES clinics(id)
 );
 
 CREATE TABLE IF NOT EXISTS lab_referrals (
-  id                    TEXT PRIMARY KEY,
-  clinic_id             TEXT NOT NULL,
-  patient_id            TEXT NOT NULL,
-  file_id               TEXT NOT NULL,
-  lab_id                TEXT NOT NULL,
-  referred_by           TEXT NOT NULL,
-  reference_number      TEXT NOT NULL,
-  referral_date         TEXT DEFAULT (datetime('now')),
-  urgency               TEXT DEFAULT 'routine',
+  id                    VARCHAR(36) PRIMARY KEY,
+  clinic_id             VARCHAR(36) NOT NULL,
+  patient_id            VARCHAR(36) NOT NULL,
+  file_id               VARCHAR(36) NOT NULL,
+  lab_id                VARCHAR(36) NOT NULL,
+  referred_by           VARCHAR(36) NOT NULL,
+  reference_number      VARCHAR(255) NOT NULL,
+  referral_date         DATETIME DEFAULT CURRENT_TIMESTAMP,
+  urgency               VARCHAR(255) DEFAULT 'routine',
   clinical_notes        TEXT,
   special_instructions  TEXT,
-  status                TEXT DEFAULT 'pending',
-  letter_path           TEXT,
-  letter_generated_at   TEXT,
-  email_sent_at         TEXT,
-  email_sent_to         TEXT,
-  whatsapp_sent_at      TEXT,
-  whatsapp_sent_to      TEXT,
-  deleted_at            TEXT DEFAULT NULL,
-  created_at            TEXT DEFAULT (datetime('now')),
-  updated_at            TEXT DEFAULT (datetime('now')),
+  status                VARCHAR(255) DEFAULT 'pending',
+  letter_path           VARCHAR(255),
+  letter_generated_at   VARCHAR(255),
+  email_sent_at         VARCHAR(255),
+  email_sent_to         VARCHAR(255),
+  whatsapp_sent_at      VARCHAR(255),
+  whatsapp_sent_to      VARCHAR(255),
+  deleted_at            DATETIME DEFAULT NULL,
+  created_at            DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at            DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id)  REFERENCES clinics(id),
   FOREIGN KEY (patient_id) REFERENCES patients(id),
   FOREIGN KEY (file_id)    REFERENCES patient_files(id),
@@ -400,24 +402,24 @@ CREATE TABLE IF NOT EXISTS lab_referrals (
 );
 
 CREATE TABLE IF NOT EXISTS referral_tests (
-  id           TEXT PRIMARY KEY,
-  referral_id  TEXT NOT NULL,
-  test_name    TEXT NOT NULL,
-  test_code    TEXT,
+  id           VARCHAR(36) PRIMARY KEY,
+  referral_id  VARCHAR(36) NOT NULL,
+  test_name    VARCHAR(255) NOT NULL,
+  test_code    VARCHAR(255),
   instructions TEXT,
   sort_order   INTEGER DEFAULT 0,
   FOREIGN KEY (referral_id) REFERENCES lab_referrals(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS referral_communications (
-  id            TEXT PRIMARY KEY,
-  referral_id   TEXT NOT NULL,
-  channel       TEXT NOT NULL,
-  sent_to       TEXT,
-  sent_by       TEXT,
-  status        TEXT DEFAULT 'sent',
+  id            VARCHAR(36) PRIMARY KEY,
+  referral_id   VARCHAR(36) NOT NULL,
+  channel       VARCHAR(255) NOT NULL,
+  sent_to       VARCHAR(255),
+  sent_by       VARCHAR(36),
+  status        VARCHAR(255) DEFAULT 'sent',
   error_message TEXT,
-  sent_at       TEXT DEFAULT (datetime('now')),
+  sent_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (referral_id) REFERENCES lab_referrals(id),
   FOREIGN KEY (sent_by)     REFERENCES users(id)
 );
@@ -426,36 +428,36 @@ CREATE TABLE IF NOT EXISTS referral_communications (
 -- PLANS (managed by platform admin)
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS plans (
-  id                TEXT PRIMARY KEY,
-  name              TEXT NOT NULL,
-  slug              TEXT NOT NULL UNIQUE,
+  id                VARCHAR(36) PRIMARY KEY,
+  name              VARCHAR(255) NOT NULL,
+  slug              VARCHAR(255) NOT NULL UNIQUE,
   monthly_price_cents INTEGER DEFAULT 0,
   annual_price_cents  INTEGER DEFAULT 0,
   annual_discount_percent INTEGER DEFAULT 0,
-  tagline            TEXT,
+  tagline            VARCHAR(255),
   feature_bullets    TEXT,
   is_popular         INTEGER DEFAULT 0,
   show_on_landing    INTEGER DEFAULT 1,
   display_order      INTEGER DEFAULT 0,
-  status             TEXT DEFAULT 'active',
-  deleted_at         TEXT DEFAULT NULL,
-  created_at         TEXT DEFAULT (datetime('now')),
-  updated_at         TEXT DEFAULT (datetime('now'))
+  status             VARCHAR(255) DEFAULT 'active',
+  deleted_at         DATETIME DEFAULT NULL,
+  created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS plan_modules (
-  id         TEXT PRIMARY KEY,
-  plan_id    TEXT NOT NULL,
-  module_key TEXT NOT NULL,
+  id         VARCHAR(36) PRIMARY KEY,
+  plan_id    VARCHAR(36) NOT NULL,
+  module_key VARCHAR(255) NOT NULL,
   is_enabled INTEGER DEFAULT 1,
   FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
   UNIQUE(plan_id, module_key)
 );
 
 CREATE TABLE IF NOT EXISTS plan_limits (
-  id         TEXT PRIMARY KEY,
-  plan_id    TEXT NOT NULL,
-  limit_key  TEXT NOT NULL,
+  id         VARCHAR(36) PRIMARY KEY,
+  plan_id    VARCHAR(36) NOT NULL,
+  limit_key  VARCHAR(255) NOT NULL,
   limit_value INTEGER NOT NULL,
   FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
   UNIQUE(plan_id, limit_key)
@@ -465,12 +467,14 @@ CREATE TABLE IF NOT EXISTS plan_limits (
 -- MOCK PAYMENTS
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS mock_payments (
-  id              TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  plan            TEXT DEFAULT 'pro',
+  id              VARCHAR(36) PRIMARY KEY,
+  organization_id VARCHAR(36) NOT NULL,
+  plan            VARCHAR(255) DEFAULT 'pro',
   amount_usd      REAL DEFAULT 5.00,
-  status          TEXT DEFAULT 'success',
-  mock_receipt    TEXT,
-  activated_at    TEXT DEFAULT (datetime('now')),
+  status          VARCHAR(255) DEFAULT 'success',
+  mock_receipt    VARCHAR(255),
+  activated_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (organization_id) REFERENCES organizations(id)
 );
+
+SET FOREIGN_KEY_CHECKS = 1;

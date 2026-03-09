@@ -7,7 +7,7 @@ class BaseRepository {
     this.db = db;
   }
 
-  findById(id, clinicId = null) {
+  async findById(id, clinicId = null) {
     let query = `SELECT * FROM ${this.table} WHERE id = ? AND deleted_at IS NULL`;
     const params = [id];
 
@@ -16,34 +16,36 @@ class BaseRepository {
       params.push(clinicId);
     }
 
-    return this.db.get(query, params) || null;
+    const [rows] = await this.db.execute(query, params);
+    return rows[0] || null;
   }
 
-  findAll(clinicId, { limit = 20, offset = 0, orderBy = 'created_at', order = 'DESC' } = {}) {
-    const rows = this.db.all(
+  async findAll(clinicId, { limit = 20, offset = 0, orderBy = 'created_at', order = 'DESC' } = {}) {
+    const [rows] = await this.db.execute(
       `SELECT * FROM ${this.table}
        WHERE clinic_id = ? AND deleted_at IS NULL
        ORDER BY ${orderBy} ${order}
        LIMIT ? OFFSET ?`,
-      [clinicId, limit, offset]
+      [clinicId, parseInt(limit), parseInt(offset)]
     );
-    const { total } = this.db.get(
+
+    const [countRows] = await this.db.execute(
       `SELECT COUNT(*) as total FROM ${this.table} WHERE clinic_id = ? AND deleted_at IS NULL`,
       [clinicId]
     );
-    return { rows, total };
+
+    return { rows, total: countRows[0].total };
   }
 
-  create(data) {
+  async create(data) {
     const id = generateId();
-    const now = new Date().toISOString();
-    const record = { id, ...data, created_at: now, updated_at: now };
+    const record = { id, ...data }; // timestamps handled by MySQL DEFAULT CURRENT_TIMESTAMP
 
     const columns = Object.keys(record).join(', ');
     const placeholders = Object.keys(record).map(() => '?').join(', ');
     const values = Object.values(record);
 
-    this.db.run(
+    await this.db.execute(
       `INSERT INTO ${this.table} (${columns}) VALUES (${placeholders})`,
       values
     );
@@ -51,12 +53,15 @@ class BaseRepository {
     return this.findById(id);
   }
 
-  update(id, clinicId, data) {
-    const updated = { ...data, updated_at: new Date().toISOString() };
+  async update(id, clinicId, data) {
+    const updated = { ...data }; // updated_at could be handled here or via MySQL trigger/manual update
+    // For now, let's keep manual update for updated_at if not handled by MySQL
+    updated.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
     const setClause = Object.keys(updated).map((key) => `${key} = ?`).join(', ');
     const values = [...Object.values(updated), id, clinicId];
 
-    this.db.run(
+    await this.db.execute(
       `UPDATE ${this.table} SET ${setClause} WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       values
     );
@@ -64,15 +69,15 @@ class BaseRepository {
     return this.findById(id, clinicId);
   }
 
-  softDelete(id, clinicId) {
-    const result = this.db.run(
-      `UPDATE ${this.table} SET deleted_at = datetime('now') WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
+  async softDelete(id, clinicId) {
+    const [result] = await this.db.execute(
+      `UPDATE ${this.table} SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [id, clinicId]
     );
-    return result.changes > 0;
+    return result.affectedRows > 0;
   }
 
-  exists(id, clinicId = null) {
+  async exists(id, clinicId = null) {
     let query = `SELECT 1 FROM ${this.table} WHERE id = ? AND deleted_at IS NULL`;
     const params = [id];
 
@@ -81,16 +86,17 @@ class BaseRepository {
       params.push(clinicId);
     }
 
-    return !!this.db.get(query, params);
+    const [rows] = await this.db.execute(query, params);
+    return rows.length > 0;
   }
 
-  count(clinicId, whereExtra = '', paramsExtra = []) {
-    const { total } = this.db.get(
+  async count(clinicId, whereExtra = '', paramsExtra = []) {
+    const [rows] = await this.db.execute(
       `SELECT COUNT(*) as total FROM ${this.table}
        WHERE clinic_id = ? AND deleted_at IS NULL ${whereExtra}`,
       [clinicId, ...paramsExtra]
     );
-    return total;
+    return rows[0].total;
   }
 }
 

@@ -5,37 +5,39 @@ class BillingRepository extends BaseRepository {
     super('patient_billing');
   }
 
-  findByPatient(patientId, clinicId, { limit = 20, offset = 0 } = {}) {
-    const rows = this.db.all(
+  async findByPatient(patientId, clinicId, { limit = 20, offset = 0 } = {}) {
+    const [rows] = await this.db.execute(
       `SELECT * FROM ${this.table}
        WHERE patient_id = ? AND clinic_id = ? AND deleted_at IS NULL
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
-      [patientId, clinicId, limit, offset]
+      [patientId, clinicId, parseInt(limit), parseInt(offset)]
     );
-    const { total } = this.db.get(
+
+    const [countRows] = await this.db.execute(
       `SELECT COUNT(*) as total FROM ${this.table}
        WHERE patient_id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [patientId, clinicId]
     );
-    return { rows, total };
+
+    return { rows, total: countRows[0].total };
   }
 
-  getLastInvoiceNumber(clinicId) {
-    const row = this.db.get(
+  async getLastInvoiceNumber(clinicId) {
+    const [rows] = await this.db.execute(
       `SELECT invoice_number FROM ${this.table}
        WHERE clinic_id = ? AND deleted_at IS NULL
        ORDER BY created_at DESC
        LIMIT 1`,
       [clinicId]
     );
-    return row ? row.invoice_number : null;
+    return rows[0] ? rows[0].invoice_number : null;
   }
 
-  updatePayment(id, clinicId, { paid_amount, payment_status, payment_method, paid_at }) {
-    this.db.run(
+  async updatePayment(id, clinicId, { paid_amount, payment_status, payment_method, paid_at }) {
+    await this.db.execute(
       `UPDATE ${this.table}
-       SET paid_amount = ?, payment_status = ?, payment_method = ?, paid_at = ?, updated_at = datetime('now')
+       SET paid_amount = ?, payment_status = ?, payment_method = ?, paid_at = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [paid_amount, payment_status, payment_method, paid_at, id, clinicId]
     );

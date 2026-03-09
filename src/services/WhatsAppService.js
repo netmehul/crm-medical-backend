@@ -36,12 +36,12 @@ For queries: ${clinic.phone || clinic.email || ''}
 
   _generateDeepLink(phone, message) {
     const cleanPhone = phone.replace(/[^0-9]/g, '');
-    const encoded    = encodeURIComponent(message);
+    const encoded = encodeURIComponent(message);
     return `https://wa.me/${cleanPhone}?text=${encoded}`;
   }
 
   async prepareWhatsApp(referralId, sentByUserId, phoneOverride = null) {
-    const referral = db.get(
+    const [referralRows] = await db.execute(
       `SELECT r.*, p.full_name AS patient_name, p.patient_code, p.age, p.gender, p.phone AS patient_phone,
               l.name AS lab_name, l.contact_person AS lab_contact, l.email AS lab_email,
               l.phone AS lab_phone, l.whatsapp_number AS lab_whatsapp,
@@ -53,11 +53,13 @@ For queries: ${clinic.phone || clinic.email || ''}
        WHERE r.id = ?`,
       [referralId]
     );
+    const referral = referralRows[0];
 
     if (!referral) throw { statusCode: 404, message: 'Referral not found' };
 
-    const clinic = db.get(`SELECT * FROM clinics WHERE id = ?`, [referral.clinic_id]);
-    const tests  = db.all(
+    const [clinicRows] = await db.execute(`SELECT * FROM clinics WHERE id = ?`, [referral.clinic_id]);
+    const clinic = clinicRows[0];
+    const [testRows] = await db.execute(
       `SELECT * FROM referral_tests WHERE referral_id = ? ORDER BY sort_order ASC`, [referralId]
     );
 
@@ -65,20 +67,32 @@ For queries: ${clinic.phone || clinic.email || ''}
     if (!phone) throw { statusCode: 400, message: 'Lab has no WhatsApp/phone number on record' };
 
     const patient = { full_name: referral.patient_name, patient_code: referral.patient_code, age: referral.age, gender: referral.gender, phone: referral.patient_phone };
-    const lab     = { name: referral.lab_name, contact_person: referral.lab_contact, email: referral.lab_email };
-    const message = this._buildMessage(referral, patient, lab, clinic, tests);
+    const lab = { name: referral.lab_name, contact_person: referral.lab_contact, email: referral.lab_email };
+    const message = this._buildMessage(referral, patient, lab, clinic, testRows);
     const deepLink = this._generateDeepLink(phone, message);
 
-    db.run(
-      `INSERT INTO referral_communications (id, referral_id, channel, sent_to, sent_by, status, sent_at)
-       VALUES (?, ?, 'whatsapp', ?, ?, 'sent', datetime('now'))`,
-      [generateId(), referralId, phone, sentByUserId]
-    );
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
 
-    db.run(
-      `UPDATE lab_referrals SET whatsapp_sent_at = datetime('now'), whatsapp_sent_to = ?, updated_at = datetime('now') WHERE id = ?`,
-      [phone, referralId]
-    );
+      await conn.execute(
+        `INSERT INTO referral_communications (id, referral_id, channel, sent_to, sent_by, status, sent_at)
+         VALUES (?, ?, 'whatsapp', ?, ?, 'sent', CURRENT_TIMESTAMP)`,
+        [generateId(), referralId, phone, sentByUserId]
+      );
+
+      await conn.execute(
+        `UPDATE lab_referrals SET whatsapp_sent_at = CURRENT_TIMESTAMP, whatsapp_sent_to = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [phone, referralId]
+      );
+
+      await conn.commit();
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
+    }
 
     return { deepLink, phone, message };
   }

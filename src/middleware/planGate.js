@@ -15,9 +15,9 @@ const FALLBACK_LIMITS = {
   labCommunication: false,
 };
 
-const planGate = (featureKey) => (req, res, next) => {
+const planGate = (featureKey) => async (req, res, next) => {
   const planSlug = req.plan || 'free';
-  let config = PlanService.getPlanConfig(planSlug);
+  let config = await PlanService.getPlanConfig(planSlug);
 
   if (!config) {
     config = { modules: FALLBACK_LIMITS, limits: FALLBACK_LIMITS };
@@ -48,11 +48,11 @@ const planGate = (featureKey) => (req, res, next) => {
   if (featureKey === 'patients') {
     const limit = limits.patients ?? FALLBACK_LIMITS.patients;
     if (limit !== Infinity && limit !== -1) {
-      const { count } = db.get(
+      const [rows] = await db.execute(
         `SELECT COUNT(*) as count FROM patients WHERE clinic_id = ? AND deleted_at IS NULL`,
         [clinicId]
       );
-      if (count >= limit) {
+      if (rows[0].count >= limit) {
         return res.status(403).json({
           success: false,
           code: 'PLAN_LIMIT',
@@ -66,14 +66,14 @@ const planGate = (featureKey) => (req, res, next) => {
   if (featureKey === 'appointmentsPerMonth') {
     const limit = limits.appointmentsPerMonth ?? FALLBACK_LIMITS.appointmentsPerMonth;
     if (limit !== Infinity && limit !== -1) {
-      const { count } = db.get(
+      const [rows] = await db.execute(
         `SELECT COUNT(*) as count FROM appointments
          WHERE clinic_id = ? AND deleted_at IS NULL
-         AND strftime('%m', created_at) = strftime('%m', 'now')
-         AND strftime('%Y', created_at) = strftime('%Y', 'now')`,
+         AND MONTH(created_at) = MONTH(CURRENT_TIMESTAMP)
+         AND YEAR(created_at) = YEAR(CURRENT_TIMESTAMP)`,
         [clinicId]
       );
-      if (count >= limit) {
+      if (rows[0].count >= limit) {
         return res.status(403).json({
           success: false,
           code: 'PLAN_LIMIT',
@@ -87,14 +87,14 @@ const planGate = (featureKey) => (req, res, next) => {
   if (featureKey === 'referralsPerMonth') {
     const limit = limits.referralsPerMonth ?? FALLBACK_LIMITS.referralsPerMonth;
     if (limit !== Infinity && limit !== -1) {
-      const { count } = db.get(
+      const [rows] = await db.execute(
         `SELECT COUNT(*) as count FROM lab_referrals
          WHERE clinic_id = ? AND deleted_at IS NULL
-         AND strftime('%m', created_at) = strftime('%m', 'now')
-         AND strftime('%Y', created_at) = strftime('%Y', 'now')`,
+         AND MONTH(created_at) = MONTH(CURRENT_TIMESTAMP)
+         AND YEAR(created_at) = YEAR(CURRENT_TIMESTAMP)`,
         [clinicId]
       );
-      if (count >= limit) {
+      if (rows[0].count >= limit) {
         return res.status(403).json({
           success: false,
           code: 'PLAN_LIMIT',
@@ -108,12 +108,12 @@ const planGate = (featureKey) => (req, res, next) => {
   if (featureKey === 'seats') {
     const limit = limits.seats ?? FALLBACK_LIMITS.seats;
     if (limit !== Infinity && limit !== -1) {
-      const { count } = db.get(
+      const [rows] = await db.execute(
         `SELECT COUNT(*) as count FROM clinic_members
          WHERE clinic_id = ? AND is_active = 1 AND deleted_at IS NULL`,
         [clinicId]
       );
-      if (count >= limit) {
+      if (rows[0].count >= limit) {
         return res.status(403).json({
           success: false,
           code: 'PLAN_LIMIT',

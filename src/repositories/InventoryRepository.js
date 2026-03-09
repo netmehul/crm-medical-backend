@@ -5,8 +5,8 @@ class InventoryRepository extends BaseRepository {
     super('inventory');
   }
 
-  findLowStock(clinicId) {
-    const rows = this.db.all(
+  async findLowStock(clinicId) {
+    const [rows] = await this.db.execute(
       `SELECT * FROM ${this.table}
        WHERE clinic_id = ? AND deleted_at IS NULL
          AND quantity <= low_stock_threshold
@@ -16,33 +16,35 @@ class InventoryRepository extends BaseRepository {
     return rows;
   }
 
-  adjustStock(id, clinicId, quantity) {
-    this.db.run(
+  async adjustStock(id, clinicId, quantity) {
+    await this.db.execute(
       `UPDATE ${this.table}
-       SET quantity = quantity + ?, updated_at = datetime('now')
+       SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [quantity, id, clinicId]
     );
     return this.findById(id, clinicId);
   }
 
-  search(clinicId, searchTerm, { limit = 20, offset = 0 } = {}) {
+  async search(clinicId, searchTerm, { limit = 20, offset = 0 } = {}) {
     const like = `%${searchTerm}%`;
-    const rows = this.db.all(
+    const [rows] = await this.db.execute(
       `SELECT * FROM ${this.table}
        WHERE clinic_id = ? AND deleted_at IS NULL
          AND item_name LIKE ?
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
-      [clinicId, like, limit, offset]
+      [clinicId, like, parseInt(limit), parseInt(offset)]
     );
-    const { total } = this.db.get(
+
+    const [countRows] = await this.db.execute(
       `SELECT COUNT(*) as total FROM ${this.table}
        WHERE clinic_id = ? AND deleted_at IS NULL
          AND item_name LIKE ?`,
       [clinicId, like]
     );
-    return { rows, total };
+
+    return { rows, total: countRows[0].total };
   }
 }
 

@@ -4,7 +4,6 @@
  */
 const db = require('../config/database');
 const { generateId } = require('../utils/uuid');
-const { MODULES, LIMIT_KEYS, BOOLEAN_MODULE_KEYS } = require('../config/planRegistry');
 
 const FREE_PLAN = {
   name: 'Free',
@@ -53,9 +52,9 @@ const PRO_PLAN = {
   booleans: { reportUploads: true, billing: true, inventory: true, mrManagement: true, labCommunication: true },
 };
 
-function seedPlans() {
-  const existing = db.get('SELECT id FROM plans LIMIT 1');
-  if (existing) {
+async function seedPlans() {
+  const [existingRows] = await db.execute('SELECT id FROM plans LIMIT 1');
+  if (existingRows.length) {
     console.log('  ⏭️  Plans already seeded');
     return;
   }
@@ -64,24 +63,25 @@ function seedPlans() {
   for (const p of plans) {
     const planId = generateId();
     const annualCents = p.annual_price_cents ?? Math.round((p.monthly_price_cents || 0) * 12 * (100 - (p.annual_discount_percent || 0)) / 100);
-    db.run(
+
+    await db.execute(
       `INSERT INTO plans (id, name, slug, monthly_price_cents, annual_price_cents, annual_discount_percent, tagline, feature_bullets, is_popular, show_on_landing, display_order, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [planId, p.name, p.slug, p.monthly_price_cents, annualCents, p.annual_discount_percent ?? 0, p.tagline, p.feature_bullets, p.is_popular, p.show_on_landing, p.display_order, p.status]
     );
 
-    // Merge modules + booleans into single set (modules take precedence for overlap, e.g. inventory)
+    // Merge modules + booleans into single set
     const allModuleKeys = new Set([...p.modules, ...Object.keys(p.booleans)]);
     for (const modKey of allModuleKeys) {
       const isEnabled = p.modules.includes(modKey) ? 1 : (p.booleans[modKey] ? 1 : 0);
-      db.run(
+      await db.execute(
         `INSERT INTO plan_modules (id, plan_id, module_key, is_enabled) VALUES (?, ?, ?, ?)`,
         [generateId(), planId, modKey, isEnabled]
       );
     }
 
     for (const [limitKey, val] of Object.entries(p.limits)) {
-      db.run(
+      await db.execute(
         `INSERT INTO plan_limits (id, plan_id, limit_key, limit_value) VALUES (?, ?, ?, ?)`,
         [generateId(), planId, limitKey, val]
       );

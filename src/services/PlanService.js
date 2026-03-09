@@ -9,17 +9,17 @@ function invalidateCache() {
   planConfigCache = null;
 }
 
-function _buildPlanConfig() {
-  const plans = db.all(
+async function _buildPlanConfig() {
+  const [plans] = await db.execute(
     `SELECT id, slug, name FROM plans WHERE deleted_at IS NULL AND status = 'active'`
   );
   const config = {};
   for (const p of plans) {
-    const modules = db.all(
+    const [modules] = await db.execute(
       `SELECT module_key, is_enabled FROM plan_modules WHERE plan_id = ?`,
       [p.id]
     );
-    const limits = db.all(
+    const [limits] = await db.execute(
       `SELECT limit_key, limit_value FROM plan_limits WHERE plan_id = ?`,
       [p.id]
     );
@@ -36,8 +36,8 @@ function _buildPlanConfig() {
   return config;
 }
 
-function getPlanConfig(planSlug) {
-  if (!planConfigCache) planConfigCache = _buildPlanConfig();
+async function getPlanConfig(planSlug) {
+  if (!planConfigCache) planConfigCache = await _buildPlanConfig();
   const cfg = planConfigCache[planSlug];
   if (!cfg) return null;
   return cfg;
@@ -49,29 +49,31 @@ function _computeAnnualCents(monthlyCents, discountPercent) {
   return Math.round(monthlyCents * 12 * (100 - pct) / 100);
 }
 
-function _getModulesAndLimits(planId) {
-  const modules = db.all(`SELECT module_key, is_enabled FROM plan_modules WHERE plan_id = ?`, [planId]);
-  const limits = db.all(`SELECT limit_key, limit_value FROM plan_limits WHERE plan_id = ?`, [planId]);
+async function _getModulesAndLimits(planId) {
+  const [modules] = await db.execute(`SELECT module_key, is_enabled FROM plan_modules WHERE plan_id = ?`, [planId]);
+  const [limits] = await db.execute(`SELECT limit_key, limit_value FROM plan_limits WHERE plan_id = ?`, [planId]);
   const modMap = modules.reduce((acc, m) => ({ ...acc, [m.module_key]: m.is_enabled === 1 }), {});
   const limMap = limits.reduce((acc, l) => ({ ...acc, [l.limit_key]: l.limit_value === -1 ? Infinity : l.limit_value }), {});
   return { modules: modMap, limits: limMap };
 }
 
-function getPublicPlans() {
-  const rows = db.all(
+async function getPublicPlans() {
+  const [rows] = await db.execute(
     `SELECT id, name, slug, monthly_price_cents, annual_price_cents, annual_discount_percent, tagline, is_popular, display_order
      FROM plans
      WHERE deleted_at IS NULL AND status = 'active' AND show_on_landing = 1
      ORDER BY display_order ASC, name ASC`
   );
-  return rows.map((p) => {
-    const { modules, limits } = _getModulesAndLimits(p.id);
+
+  const results = [];
+  for (const p of rows) {
+    const { modules, limits } = await _getModulesAndLimits(p.id);
     const bullets = buildFeatureBullets(modules, limits);
     const annualCents = p.annual_price_cents ?? _computeAnnualCents(p.monthly_price_cents, p.annual_discount_percent);
     const limitsForApi = Object.fromEntries(
       Object.entries(limits).map(([k, v]) => [k, v === Infinity ? -1 : v])
     );
-    return {
+    results.push({
       id: p.id,
       name: p.name,
       slug: p.slug,
@@ -84,22 +86,25 @@ function getPublicPlans() {
       modules: modules,
       isPopular: p.is_popular === 1,
       displayOrder: p.display_order,
-    };
-  });
+    });
+  }
+  return results;
 }
 
-function getAllPlans() {
-  const rows = db.all(
+async function getAllPlans() {
+  const [rows] = await db.execute(
     `SELECT p.*,
        (SELECT COUNT(*) FROM organizations o WHERE o.plan = p.slug AND o.deleted_at IS NULL) AS org_count
      FROM plans p
      WHERE p.deleted_at IS NULL
      ORDER BY p.display_order ASC, p.name ASC`
   );
-  return rows.map((p) => {
-    const { modules, limits } = _getModulesAndLimits(p.id);
+
+  const results = [];
+  for (const p of rows) {
+    const { modules, limits } = await _getModulesAndLimits(p.id);
     const bullets = buildFeatureBullets(modules, limits);
-    return {
+    results.push({
       id: p.id,
       name: p.name,
       slug: p.slug,
@@ -115,17 +120,19 @@ function getAllPlans() {
       orgCount: p.org_count || 0,
       createdAt: p.created_at,
       updatedAt: p.updated_at,
-    };
-  });
+    });
+  }
+  return results;
 }
 
-function getPlanById(id) {
-  const p = db.get(`SELECT * FROM plans WHERE id = ? AND deleted_at IS NULL`, [id]);
+async function getPlanById(id) {
+  const [plans] = await db.execute(`SELECT * FROM plans WHERE id = ? AND deleted_at IS NULL`, [id]);
+  const p = plans[0];
   if (!p) return null;
 
-  const modules = db.all(`SELECT module_key, is_enabled FROM plan_modules WHERE plan_id = ?`, [id]);
-  const limits = db.all(`SELECT limit_key, limit_value FROM plan_limits WHERE plan_id = ?`, [id]);
-  const orgCount = db.get(
+  const [modules] = await db.execute(`SELECT module_key, is_enabled FROM plan_modules WHERE plan_id = ?`, [id]);
+  const [limits] = await db.execute(`SELECT limit_key, limit_value FROM plan_limits WHERE plan_id = ?`, [id]);
+  const [orgCountRow] = await db.execute(
     `SELECT COUNT(*) AS c FROM organizations WHERE plan = ? AND deleted_at IS NULL`,
     [p.slug]
   );
@@ -147,7 +154,7 @@ function getPlanById(id) {
     showOnLanding: p.show_on_landing === 1,
     displayOrder: p.display_order,
     status: p.status,
-    orgCount: orgCount?.c || 0,
+    orgCount: orgCountRow[0]?.c || 0,
     modules: modules.reduce((acc, m) => ({ ...acc, [m.module_key]: m.is_enabled === 1 }), {}),
     limits: limits.reduce((acc, l) => ({ ...acc, [l.limit_key]: l.limit_value }), {}),
     createdAt: p.created_at,
@@ -155,13 +162,14 @@ function getPlanById(id) {
   };
 }
 
-function createPlan(data) {
+async function createPlan(data) {
   const id = generateId();
   const slug = (data.slug || data.name?.toLowerCase().replace(/\s+/g, '_')) || 'plan';
   const monthlyCents = data.monthlyPriceCents ?? 0;
   const discountPct = data.annualDiscountPercent ?? 0;
   const annualCents = data.annualPriceCents ?? _computeAnnualCents(monthlyCents, discountPct);
-  db.run(
+
+  await db.execute(
     `INSERT INTO plans (id, name, slug, monthly_price_cents, annual_price_cents, annual_discount_percent, tagline, feature_bullets, is_popular, show_on_landing, display_order, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
@@ -179,21 +187,23 @@ function createPlan(data) {
       data.status || 'draft',
     ]
   );
-  _saveModules(id, data.modules || {});
-  _saveLimits(id, data.limits || {});
+
+  await _saveModules(id, data.modules || {});
+  await _saveLimits(id, data.limits || {});
   invalidateCache();
   return getPlanById(id);
 }
 
-function updatePlan(id, data) {
-  const existing = db.get(`SELECT id FROM plans WHERE id = ? AND deleted_at IS NULL`, [id]);
-  if (!existing) return null;
+async function updatePlan(id, data) {
+  const [exists] = await db.execute(`SELECT id FROM plans WHERE id = ? AND deleted_at IS NULL`, [id]);
+  if (!exists.length) return null;
 
   if (data.isPopular) {
-    db.run(`UPDATE plans SET is_popular = 0 WHERE id != ?`, [id]);
+    await db.execute(`UPDATE plans SET is_popular = 0 WHERE id != ?`, [id]);
   }
 
-  const current = db.get('SELECT monthly_price_cents, annual_discount_percent FROM plans WHERE id = ?', [id]);
+  const [currentRows] = await db.execute('SELECT monthly_price_cents, annual_discount_percent FROM plans WHERE id = ?', [id]);
+  const current = currentRows[0];
   const monthlyCents = data.monthlyPriceCents ?? current?.monthly_price_cents ?? 0;
   const discountPct = data.annualDiscountPercent ?? current?.annual_discount_percent ?? 0;
 
@@ -216,19 +226,19 @@ function updatePlan(id, data) {
 
   if (updates.length) {
     params.push(id);
-    db.run(`UPDATE plans SET ${updates.join(', ')}, updated_at = datetime('now') WHERE id = ?`, params);
+    await db.execute(`UPDATE plans SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, params);
   }
-  if (data.modules) _saveModules(id, data.modules);
-  if (data.limits) _saveLimits(id, data.limits);
+  if (data.modules) await _saveModules(id, data.modules);
+  if (data.limits) await _saveLimits(id, data.limits);
   invalidateCache();
   return getPlanById(id);
 }
 
-function _saveModules(planId, modules) {
-  db.run(`DELETE FROM plan_modules WHERE plan_id = ?`, [planId]);
+async function _saveModules(planId, modules) {
+  await db.execute(`DELETE FROM plan_modules WHERE plan_id = ?`, [planId]);
   for (const [key, enabled] of Object.entries(modules)) {
     if (enabled === true || enabled === false) {
-      db.run(
+      await db.execute(
         `INSERT INTO plan_modules (id, plan_id, module_key, is_enabled) VALUES (?, ?, ?, ?)`,
         [generateId(), planId, key, enabled ? 1 : 0]
       );
@@ -236,12 +246,12 @@ function _saveModules(planId, modules) {
   }
 }
 
-function _saveLimits(planId, limits) {
-  db.run(`DELETE FROM plan_limits WHERE plan_id = ?`, [planId]);
+async function _saveLimits(planId, limits) {
+  await db.execute(`DELETE FROM plan_limits WHERE plan_id = ?`, [planId]);
   for (const [key, val] of Object.entries(limits)) {
     const v = val === Infinity || val === -1 ? -1 : parseInt(val, 10);
     if (!isNaN(v)) {
-      db.run(
+      await db.execute(
         `INSERT INTO plan_limits (id, plan_id, limit_key, limit_value) VALUES (?, ?, ?, ?)`,
         [generateId(), planId, key, v]
       );
@@ -249,8 +259,8 @@ function _saveLimits(planId, limits) {
   }
 }
 
-function duplicatePlan(id) {
-  const src = getPlanById(id);
+async function duplicatePlan(id) {
+  const src = await getPlanById(id);
   if (!src) return null;
   const { id: _id, orgCount: _oc, createdAt: _c, updatedAt: _u, ...rest } = src;
   rest.name = `${src.name} (Copy)`;
@@ -260,10 +270,10 @@ function duplicatePlan(id) {
   return createPlan(rest);
 }
 
-function deletePlan(id) {
-  const p = db.get(`SELECT id FROM plans WHERE id = ? AND deleted_at IS NULL`, [id]);
-  if (!p) return false;
-  db.run(`UPDATE plans SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`, [id]);
+async function deletePlan(id) {
+  const [plans] = await db.execute(`SELECT id FROM plans WHERE id = ? AND deleted_at IS NULL`, [id]);
+  if (!plans.length) return false;
+  await db.execute(`UPDATE plans SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [id]);
   invalidateCache();
   return true;
 }

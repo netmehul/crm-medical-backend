@@ -5,34 +5,36 @@ class UserRepository extends BaseRepository {
     super('users');
   }
 
-  findByEmail(email) {
-    const row = this.db.get(
+  async findByEmail(email) {
+    const [rows] = await this.db.execute(
       `SELECT * FROM ${this.table} WHERE email = ? AND deleted_at IS NULL`,
       [email]
     );
-    return row || null;
+    return rows[0] || null;
   }
 
-  findByClinic(clinicId, { limit = 20, offset = 0 } = {}) {
-    const rows = this.db.all(
+  async findByClinic(clinicId, { limit = 20, offset = 0 } = {}) {
+    const [rows] = await this.db.execute(
       `SELECT * FROM ${this.table}
        WHERE clinic_id = ? AND deleted_at IS NULL
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
-      [clinicId, limit, offset]
+      [clinicId, parseInt(limit), parseInt(offset)]
     );
-    const { total } = this.db.get(
+
+    const [countRows] = await this.db.execute(
       `SELECT COUNT(*) as total FROM ${this.table}
        WHERE clinic_id = ? AND deleted_at IS NULL`,
       [clinicId]
     );
-    return { rows, total };
+
+    return { rows, total: countRows[0].total };
   }
 
-  deactivate(id, clinicId) {
-    this.db.run(
+  async deactivate(id, clinicId) {
+    await this.db.execute(
       `UPDATE ${this.table}
-       SET is_active = 0, updated_at = datetime('now')
+       SET is_active = 0, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [id, clinicId]
     );

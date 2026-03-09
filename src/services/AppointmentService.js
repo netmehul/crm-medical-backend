@@ -26,7 +26,7 @@ class AppointmentService {
       params.push(query.patient_id);
     }
 
-    const rows = db.all(
+    const [rows] = await db.execute(
       `SELECT a.*, p.full_name AS patient_name, p.age AS patient_age, u.full_name AS doctor_name
        FROM appointments a
        LEFT JOIN patients p ON p.id = a.patient_id AND p.deleted_at IS NULL
@@ -34,19 +34,19 @@ class AppointmentService {
        WHERE ${where}
        ORDER BY a.scheduled_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+      [...params, parseInt(limit), parseInt(offset)]
     );
 
-    const { total } = db.get(
+    const [countRows] = await db.execute(
       `SELECT COUNT(*) AS total FROM appointments a WHERE ${where}`,
       params
     );
 
-    return paginatedResponse(rows, total, page, limit);
+    return paginatedResponse(rows, countRows[0].total, page, limit);
   }
 
   async getAppointment(id, clinicId) {
-    const row = db.get(
+    const [rows] = await db.execute(
       `SELECT a.*, p.full_name AS patient_name, p.age AS patient_age, u.full_name AS doctor_name
        FROM appointments a
        LEFT JOIN patients p ON p.id = a.patient_id AND p.deleted_at IS NULL
@@ -54,6 +54,7 @@ class AppointmentService {
        WHERE a.id = ? AND a.clinic_id = ? AND a.deleted_at IS NULL`,
       [id, clinicId]
     );
+    const row = rows[0];
 
     if (!row) {
       throw { statusCode: 404, message: 'Appointment not found' };
@@ -63,7 +64,7 @@ class AppointmentService {
 
   async createAppointment(clinicId, userId, data) {
     const id = generateId();
-    const now = new Date().toISOString();
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
     const doctorId = data.doctor_id || userId;
     if (!doctorId) {
@@ -72,34 +73,46 @@ class AppointmentService {
 
     const scheduledAt = data.scheduled_at
       || (data.appointment_date && data.start_time
-          ? `${data.appointment_date}T${data.start_time}:00.000Z`
-          : data.appointment_date || now);
+        ? `${data.appointment_date} ${data.start_time}:00`
+        : data.appointment_date || now);
 
-    db.run(
-      `INSERT INTO appointments
-         (id, clinic_id, patient_id, doctor_id, file_id, scheduled_at, duration_mins, status, type, reason, notes, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id, clinicId,
-        data.patient_id, doctorId,
-        data.file_id || null,
-        scheduledAt,
-        data.duration_mins || 30,
-        data.status || 'scheduled', data.type || 'general',
-        data.reason || null, data.notes || null,
-        userId, now, now,
-      ]
-    );
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
 
-    if (data.patient_id) {
-      db.run(
-        `UPDATE patient_files SET last_visit_at = ?, updated_at = ?
-         WHERE patient_id = ? AND clinic_id = ? AND deleted_at IS NULL`,
-        [now, now, data.patient_id, clinicId]
+      await conn.execute(
+        `INSERT INTO appointments
+           (id, clinic_id, patient_id, doctor_id, file_id, scheduled_at, duration_mins, status, type, reason, notes, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id, clinicId,
+          data.patient_id, doctorId,
+          data.file_id || null,
+          scheduledAt,
+          data.duration_mins || 30,
+          data.status || 'scheduled', data.type || 'general',
+          data.reason || null, data.notes || null,
+          userId, now, now,
+        ]
       );
+
+      if (data.patient_id) {
+        await conn.execute(
+          `UPDATE patient_files SET last_visit_at = ?, updated_at = ?
+           WHERE patient_id = ? AND clinic_id = ? AND deleted_at IS NULL`,
+          [now, now, data.patient_id, clinicId]
+        );
+      }
+
+      await conn.commit();
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
     }
 
-    return this.getAppointment(id, clinicId);
+    return await this.getAppointment(id, clinicId);
   }
 
   async updateAppointment(id, clinicId, data) {
@@ -116,24 +129,24 @@ class AppointmentService {
 
     if (Object.keys(allowed).length === 0) return existing;
 
-    allowed.updated_at = new Date().toISOString();
+    allowed.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
     const setClause = Object.keys(allowed).map(k => `${k} = ?`).join(', ');
     const values = [...Object.values(allowed), id, clinicId];
 
-    db.run(
+    await db.execute(
       `UPDATE appointments SET ${setClause} WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       values
     );
 
-    return this.getAppointment(id, clinicId);
+    return await this.getAppointment(id, clinicId);
   }
 
   async deleteAppointment(id, clinicId) {
-    const result = db.run(
-      `UPDATE appointments SET deleted_at = datetime('now') WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
+    const [result] = await db.execute(
+      `UPDATE appointments SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND clinic_id = ? AND deleted_at IS NULL`,
       [id, clinicId]
     );
-    if (result.changes === 0) {
+    if (result.affectedRows === 0) {
       throw { statusCode: 404, message: 'Appointment not found' };
     }
     return true;
