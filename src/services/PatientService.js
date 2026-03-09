@@ -125,8 +125,19 @@ class PatientService {
     return paginatedResponse(rows, countRows[0].total, page, limit);
   }
 
-  async getPatient(patientId, clinicId) {
-    const patient = await this._getPatientWithFile(patientId, clinicId);
+  async getPatient(idOrCode, clinicId) {
+    const [rows] = await db.execute(
+      `SELECT p.*,
+        pf.id AS file_id, pf.file_number, pf.assigned_doctor,
+        pf.status AS file_status, pf.last_visit_at, pf.next_followup_at,
+        u.full_name AS assigned_doctor_name
+       FROM patients p
+       LEFT JOIN patient_files pf ON pf.patient_id = p.id AND pf.deleted_at IS NULL
+       LEFT JOIN users u ON u.id = pf.assigned_doctor AND u.deleted_at IS NULL
+       WHERE (p.id = ? OR p.patient_code = ?) AND p.clinic_id = ? AND p.deleted_at IS NULL`,
+      [idOrCode, idOrCode, clinicId]
+    );
+    const patient = rows[0];
     if (!patient) throw { statusCode: 404, message: 'Patient not found' };
     return patient;
   }
