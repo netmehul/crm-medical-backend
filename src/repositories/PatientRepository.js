@@ -13,7 +13,7 @@ class PatientRepository extends BaseRepository {
          AND (full_name LIKE ? OR phone LIKE ? OR patient_code LIKE ?)
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
-      [clinicId, like, like, like, sqlLimit, sqlOffset]
+      [clinicId, like, like, like, String(limit), String(offset)]
     );
 
     const [countRows] = await this.db.execute(

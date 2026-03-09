@@ -13,7 +13,7 @@ class NoteRepository extends BaseRepository {
        WHERE pn.patient_id = ? AND pn.clinic_id = ? AND pn.deleted_at IS NULL
        ORDER BY pn.created_at DESC
        LIMIT ? OFFSET ?`,
-      [patientId, clinicId, sqlLimit, sqlOffset]
+      [patientId, clinicId, String(limit), String(offset)]
     );
 
     const [countRows] = await this.db.execute(

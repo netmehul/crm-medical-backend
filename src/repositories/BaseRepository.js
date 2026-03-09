@@ -26,7 +26,7 @@ class BaseRepository {
        WHERE clinic_id = ? AND deleted_at IS NULL
        ORDER BY ${orderBy} ${order}
        LIMIT ? OFFSET ?`,
-      [clinicId, sqlLimit, sqlOffset]
+      [clinicId, String(limit), String(offset)]
     );
 
     const [countRows] = await this.db.execute(
