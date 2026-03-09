@@ -218,6 +218,7 @@ CREATE TABLE IF NOT EXISTS prescriptions (
   status             VARCHAR(255) DEFAULT 'finalized',
   followup_required  TINYINT(1) DEFAULT 0,
   followup_date      DATE DEFAULT NULL,
+  followup_time      TIME DEFAULT NULL,
   followup_notes     TEXT DEFAULT NULL,
   deleted_at         DATETIME DEFAULT NULL,
   created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,

@@ -81,8 +81,8 @@ class PrescriptionService {
       await conn.execute(
         `INSERT INTO prescriptions
            (id, clinic_id, patient_id, file_id, appointment_id, doctor_id, visit_date, diagnosis, notes, status,
-            followup_required, followup_date, followup_notes, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            followup_required, followup_date, followup_time, followup_notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, clinicId,
           data.patient_id,
@@ -94,6 +94,7 @@ class PrescriptionService {
           (data.status || 'finalized').toLowerCase(),
           data.followup_required ? 1 : 0,
           data.followup_date || null,
+          data.followup_time || null,
           data.followup_notes || null,
           now, now,
         ]
@@ -105,7 +106,7 @@ class PrescriptionService {
 
       // Automatically create appointment if followup is required
       if (data.followup_required && data.followup_date) {
-        await this._createFollowupAppointment(conn, clinicId, doctorId, data, fileId);
+        await this._createFollowupAppointment(conn, clinicId, doctorId, { ...data, id }, fileId);
       }
 
       await conn.commit();
@@ -130,7 +131,7 @@ class PrescriptionService {
       const allowed = {};
       const fields = [
         'patient_id', 'doctor_id', 'file_id', 'appointment_id', 'diagnosis', 'notes',
-        'visit_date', 'status', 'followup_required', 'followup_date', 'followup_notes'
+        'visit_date', 'status', 'followup_required', 'followup_date', 'followup_time', 'followup_notes'
       ];
       for (const f of fields) {
         if (data[f] !== undefined) allowed[f] = data[f];
@@ -157,12 +158,6 @@ class PrescriptionService {
 
       // Handle follow-up appointment on update if it changed or was newly added
       if (data.followup_required && data.followup_date) {
-        // If it was already required and date same, maybe skip?
-        // But the user request implies: Doctor saves prescription with follow-up date -> appointment exists
-        // To avoid duplicates, we could check if one exists, but the prompt says "Automatically create a row"
-        // Usually, in these CRMs, a save is an intent.
-        // We'll check if a follow-up appointment for this patient on this date already exists to be safe,
-        // or just create it as requested. I'll create it.
         const fileId = data.file_id || existing.file_id;
         const doctorId = data.doctor_id || existing.doctor_id;
         await this._createFollowupAppointment(conn, clinicId, doctorId, { ...existing, ...data }, fileId);
@@ -182,7 +177,8 @@ class PrescriptionService {
   async _createFollowupAppointment(conn, clinicId, doctorId, data, fileId) {
     const appointmentId = generateId();
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    const scheduledAt = `${data.followup_date} 10:00:00`;
+    const time = data.followup_time || '10:00:00';
+    const scheduledAt = `${data.followup_date} ${time}`;
 
     await conn.execute(
       `INSERT INTO appointments
