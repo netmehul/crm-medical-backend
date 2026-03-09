@@ -4,27 +4,32 @@ const { getPagination, paginatedResponse } = require('../utils/pagination');
 class PlatformAdminService {
   async getDashboard() {
     const [totalOrgsRow] = await db.execute(
-      `SELECT COUNT(*) AS count FROM organizations WHERE deleted_at IS NULL`
+      `SELECT COUNT(*) AS count FROM organizations WHERE deleted_at IS NULL`,
+      []
     );
     const totalOrgs = totalOrgsRow[0].count;
 
     const [suspendedOrgsRow] = await db.execute(
-      `SELECT COUNT(*) AS count FROM organizations WHERE plan_status = 'suspended' AND deleted_at IS NULL`
+      `SELECT COUNT(*) AS count FROM organizations WHERE plan_status = 'suspended' AND deleted_at IS NULL`,
+      []
     );
     const suspendedOrgs = suspendedOrgsRow[0].count;
 
     const [totalUsersRow] = await db.execute(
-      `SELECT COUNT(*) AS count FROM users WHERE deleted_at IS NULL AND is_active = 1`
+      `SELECT COUNT(*) AS count FROM users WHERE deleted_at IS NULL AND is_active = 1`,
+      []
     );
     const totalUsers = totalUsersRow[0].count;
 
     const [totalClinicsRow] = await db.execute(
-      `SELECT COUNT(*) AS count FROM clinics WHERE deleted_at IS NULL AND is_active = 1`
+      `SELECT COUNT(*) AS count FROM clinics WHERE deleted_at IS NULL AND is_active = 1`,
+      []
     );
     const totalClinics = totalClinicsRow[0].count;
 
     const [totalPatientsRow] = await db.execute(
-      `SELECT COUNT(*) AS count FROM patients WHERE deleted_at IS NULL`
+      `SELECT COUNT(*) AS count FROM patients WHERE deleted_at IS NULL`,
+      []
     );
     const totalPatients = totalPatientsRow[0].count;
 
@@ -35,7 +40,8 @@ class PlatformAdminService {
        FROM organizations o
        LEFT JOIN plans p ON p.slug = o.plan AND p.deleted_at IS NULL AND p.status = 'active'
        WHERE o.deleted_at IS NULL AND o.plan_status != 'suspended'
-       GROUP BY o.plan`
+       GROUP BY o.plan`,
+      []
     );
 
     const planCounts = {};
