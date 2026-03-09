@@ -5,18 +5,18 @@ class ClinicRepository extends BaseRepository {
     super('clinics');
   }
 
-  findByOwnerEmail(email) {
-    const row = this.db.get(
+  async findByOwnerEmail(email) {
+    const [rows] = await this.db.execute(
       `SELECT * FROM ${this.table} WHERE owner_email = ? AND deleted_at IS NULL`,
       [email]
     );
-    return row || null;
+    return rows[0] || null;
   }
 
-  updatePlan(clinicId, plan, status) {
-    this.db.run(
+  async updatePlan(clinicId, plan, status) {
+    await this.db.execute(
       `UPDATE ${this.table}
-       SET plan = ?, plan_status = ?, updated_at = datetime('now')
+       SET plan = ?, plan_status = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND deleted_at IS NULL`,
       [plan, status, clinicId]
     );

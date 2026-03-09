@@ -6,9 +6,9 @@ const db = require('../config/database');
 
 async function resetPlans() {
     try {
-        await db.execute('DELETE FROM plan_limits');
-        await db.execute('DELETE FROM plan_modules');
-        await db.execute('DELETE FROM plans');
+        await db.execute('DELETE FROM plan_limits', []);
+        await db.execute('DELETE FROM plan_modules', []);
+        await db.execute('DELETE FROM plans', []);
         console.log('✅ Plans tables cleared. Restart the server to re-seed.');
         process.exit(0);
     } catch (err) {

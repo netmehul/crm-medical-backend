@@ -11,7 +11,8 @@ function invalidateCache() {
 
 async function _buildPlanConfig() {
   const [plans] = await db.execute(
-    `SELECT id, slug, name FROM plans WHERE deleted_at IS NULL AND status = 'active'`
+    `SELECT id, slug, name FROM plans WHERE deleted_at IS NULL AND status = 'active'`,
+    []
   );
   const config = {};
   for (const p of plans) {
@@ -62,7 +63,8 @@ async function getPublicPlans() {
     `SELECT id, name, slug, monthly_price_cents, annual_price_cents, annual_discount_percent, tagline, is_popular, display_order
      FROM plans
      WHERE deleted_at IS NULL AND status = 'active' AND show_on_landing = 1
-     ORDER BY display_order ASC, name ASC`
+     ORDER BY display_order ASC, name ASC`,
+    []
   );
 
   const results = [];
@@ -97,7 +99,8 @@ async function getAllPlans() {
        (SELECT COUNT(*) FROM organizations o WHERE o.plan = p.slug AND o.deleted_at IS NULL) AS org_count
      FROM plans p
      WHERE p.deleted_at IS NULL
-     ORDER BY p.display_order ASC, p.name ASC`
+     ORDER BY p.display_order ASC, p.name ASC`,
+    []
   );
 
   const results = [];

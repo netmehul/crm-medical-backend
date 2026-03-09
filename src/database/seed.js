@@ -12,32 +12,30 @@ const seed = async () => {
     const db = require('../config/database');
 
     // Drop all existing tables for a clean slate
-    // In MySQL, we need a different approach to drop all tables
     const [tables] = await db.execute(`
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = (SELECT DATABASE())
-    `);
+    `, []);
 
-    await db.execute('SET FOREIGN_KEY_CHECKS = 0;');
+    await db.execute('SET FOREIGN_KEY_CHECKS = 0;', []);
     for (const t of tables) {
-      await db.execute(`DROP TABLE IF EXISTS \`${t.TABLE_NAME}\`;`);
+      await db.execute(`DROP TABLE IF EXISTS \`${t.TABLE_NAME || t.table_name}\`;`, []);
     }
-    await db.execute('SET FOREIGN_KEY_CHECKS = 1;');
+    await db.execute('SET FOREIGN_KEY_CHECKS = 1;', []);
     console.log('  🗑️  Old tables dropped');
 
     // Load schema.sql and execute it
     const schemaPath = path.join(__dirname, 'schema.sql');
     const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
 
-    // Split schema into individual queries because execute/query only handles one at a time usually
     const queries = schemaSql
       .split(';')
       .map(q => q.trim())
       .filter(q => q.length > 0);
 
     for (const query of queries) {
-      await db.execute(query);
+      await db.execute(query, []);
     }
     console.log('  ✅ Schema created');
 
