@@ -105,7 +105,7 @@ class PlatformAdminService {
     }
 
     const [rows] = await db.execute(
-      `SELECT o.*,
+      `SELECT o.id, o.name, o.slug, o.owner_email, o.plan, o.plan_status, o.created_at,
         (SELECT COUNT(*) FROM clinics c WHERE c.organization_id = o.id AND c.deleted_at IS NULL) AS branch_count,
         (SELECT COUNT(*) FROM users u WHERE u.organization_id = o.id AND u.deleted_at IS NULL) AS user_count
        FROM organizations o
@@ -123,13 +123,15 @@ class PlatformAdminService {
     return paginatedResponse(rows, countRows[0].total, page, limit);
   }
 
-  async getOrganization(orgId) {
+  async getOrganization(idOrSlug) {
     const [orgRows] = await db.execute(
-      `SELECT * FROM organizations WHERE id = ? AND deleted_at IS NULL`,
-      [orgId]
+      `SELECT * FROM organizations WHERE (id = ? OR slug = ?) AND deleted_at IS NULL`,
+      [idOrSlug, idOrSlug]
     );
     const org = orgRows[0];
     if (!org) throw { statusCode: 404, message: 'Organization not found' };
+
+    const orgId = org.id; // Use primary key for joins
 
     const [clinics] = await db.execute(
       `SELECT * FROM clinics WHERE organization_id = ? AND deleted_at IS NULL ORDER BY created_at`,

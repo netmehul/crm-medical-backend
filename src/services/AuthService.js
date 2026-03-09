@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 const { generateId } = require('../utils/uuid');
+const { slugify } = require('../utils/slug');
 const PlanService = require('./PlanService');
 
 class AuthService {
@@ -33,10 +34,12 @@ class AuthService {
     try {
       await conn.beginTransaction();
 
+      const orgSlug = slugify(orgName);
+
       await conn.execute(
-        `INSERT INTO organizations (id, name, owner_email, phone, address, plan, plan_status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'free', 'active', ?, ?)`,
-        [orgId, orgName, ownerEmail, phone || null, address || null, now, now]
+        `INSERT INTO organizations (id, name, slug, owner_email, phone, address, plan, plan_status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'free', 'active', ?, ?)`,
+        [orgId, orgName, orgSlug, ownerEmail, phone || null, address || null, now, now]
       );
 
       await conn.execute(
