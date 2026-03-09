@@ -85,7 +85,7 @@ class PlatformAdminService {
   }
 
   async getOrganizations(query) {
-    const { page, limit, offset } = getPagination(query);
+    const { page, limit, offset, sqlLimit, sqlOffset } = getPagination(query);
 
     let where = 'o.deleted_at IS NULL';
     const params = [];
@@ -112,7 +112,7 @@ class PlatformAdminService {
        WHERE ${where}
        ORDER BY o.created_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, String(limit), String(offset)]
+      [...params, sqlLimit, sqlOffset]
     );
 
     const [countRows] = await db.execute(

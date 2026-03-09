@@ -31,7 +31,7 @@ class PrescriptionRepository extends BaseRepository {
        WHERE p.patient_id = ? AND p.clinic_id = ? AND p.deleted_at IS NULL
        ORDER BY p.created_at DESC
        LIMIT ? OFFSET ?`,
-      [patientId, clinicId, String(limit), String(offset)]
+      [patientId, clinicId, sqlLimit, sqlOffset]
     );
 
     const [countRows] = await this.db.execute(

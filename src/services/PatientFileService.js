@@ -41,7 +41,7 @@ class PatientFileService {
   // ── Reports ───────────────────────────────────────────────
 
   async getReports(patientId, clinicId, query) {
-    const { page, limit, offset } = getPagination(query);
+    const { page, limit, offset, sqlLimit, sqlOffset } = getPagination(query);
 
     const [rows] = await db.execute(
       `SELECT r.*, u.full_name AS uploaded_by_name
@@ -50,7 +50,7 @@ class PatientFileService {
        WHERE r.patient_id = ? AND r.clinic_id = ? AND r.deleted_at IS NULL
        ORDER BY r.created_at DESC
        LIMIT ? OFFSET ?`,
-      [patientId, clinicId, String(limit), String(offset)]
+      [patientId, clinicId, sqlLimit, sqlOffset]
     );
 
     const [countRows] = await db.execute(
@@ -100,7 +100,7 @@ class PatientFileService {
   // ── Notes ─────────────────────────────────────────────────
 
   async getNotes(patientId, clinicId, query) {
-    const { page, limit, offset } = getPagination(query);
+    const { page, limit, offset, sqlLimit, sqlOffset } = getPagination(query);
 
     const [rows] = await db.execute(
       `SELECT pn.*, u.full_name AS created_by_name
@@ -109,7 +109,7 @@ class PatientFileService {
        WHERE pn.patient_id = ? AND pn.clinic_id = ? AND pn.deleted_at IS NULL
        ORDER BY pn.created_at DESC
        LIMIT ? OFFSET ?`,
-      [patientId, clinicId, String(limit), String(offset)]
+      [patientId, clinicId, sqlLimit, sqlOffset]
     );
 
     const [countRows] = await db.execute(

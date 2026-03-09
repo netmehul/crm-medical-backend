@@ -79,7 +79,7 @@ class ReferralService {
   }
 
   async getReferrals(clinicId, query) {
-    const { page, limit, offset } = getPagination(query);
+    const { page, limit, offset, sqlLimit, sqlOffset } = getPagination(query);
 
     let where = 'r.clinic_id = ? AND r.deleted_at IS NULL';
     const params = [clinicId];
@@ -109,7 +109,7 @@ class ReferralService {
        WHERE ${where}
        ORDER BY r.created_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, String(limit), String(offset)]
+      [...params, sqlLimit, sqlOffset]
     );
 
     const [countRows] = await db.execute(

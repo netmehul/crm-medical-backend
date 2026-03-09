@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 8080;
 async function bootstrap() {
   try {
     // Verify database connection
-    await db.execute('SELECT 1');
+    await db.execute('SELECT 1', []);
     console.log('✅ MySQL connected');
 
     // Schema and initial seed is usually handled via scripts for MySQL,

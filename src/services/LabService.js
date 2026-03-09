@@ -5,7 +5,7 @@ const { getPagination, paginatedResponse } = require('../utils/pagination');
 class LabService {
 
   async getLabs(clinicId, query) {
-    const { page, limit, offset } = getPagination(query);
+    const { page, limit, offset, sqlLimit, sqlOffset } = getPagination(query);
 
     let where = 'clinic_id = ? AND deleted_at IS NULL';
     const params = [clinicId];
@@ -28,7 +28,7 @@ class LabService {
 
     const [rows] = await db.execute(
       `SELECT * FROM external_labs WHERE ${where} ORDER BY name ASC LIMIT ? OFFSET ?`,
-      [...params, String(limit), String(offset)]
+      [...params, sqlLimit, sqlOffset]
     );
 
     const [countRows] = await db.execute(

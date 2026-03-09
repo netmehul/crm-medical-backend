@@ -28,7 +28,7 @@ class ReportRepository extends BaseRepository {
        WHERE patient_id = ? AND clinic_id = ? AND deleted_at IS NULL
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
-      [patientId, clinicId, String(limit), String(offset)]
+      [patientId, clinicId, sqlLimit, sqlOffset]
     );
 
     const [countRows] = await this.db.execute(

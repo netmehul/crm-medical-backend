@@ -4,7 +4,7 @@ const { getPagination, paginatedResponse } = require('../utils/pagination');
 
 class BillingService {
   async getBills(clinicId, query) {
-    const { page, limit, offset } = getPagination(query);
+    const { page, limit, offset, sqlLimit, sqlOffset } = getPagination(query);
 
     let where = 'b.clinic_id = ? AND b.deleted_at IS NULL';
     const params = [clinicId];
@@ -25,7 +25,7 @@ class BillingService {
        WHERE ${where}
        ORDER BY b.created_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, String(limit), String(offset)]
+      [...params, sqlLimit, sqlOffset]
     );
 
     const [countRows] = await db.execute(

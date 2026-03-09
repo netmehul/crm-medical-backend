@@ -4,7 +4,7 @@ const { getPagination, paginatedResponse } = require('../utils/pagination');
 
 class MedicalRepService {
   async getMedicalReps(clinicId, query) {
-    const { page, limit, offset } = getPagination(query);
+    const { page, limit, offset, sqlLimit, sqlOffset } = getPagination(query);
 
     let where = 'clinic_id = ? AND deleted_at IS NULL';
     const params = [clinicId];
@@ -20,7 +20,7 @@ class MedicalRepService {
        WHERE ${where}
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, String(limit), String(offset)]
+      [...params, sqlLimit, sqlOffset]
     );
 
     const [countRows] = await db.execute(
@@ -129,7 +129,7 @@ class MedicalRepService {
   }
 
   async getVisits(mrId, clinicId, query) {
-    const { page, limit, offset } = getPagination(query);
+    const { page, limit, offset, sqlLimit, sqlOffset } = getPagination(query);
 
     const [rows] = await db.execute(
       `SELECT v.*, u.full_name AS logged_by_name
@@ -138,7 +138,7 @@ class MedicalRepService {
        WHERE v.mr_id = ? AND v.clinic_id = ?
        ORDER BY v.visit_date DESC
        LIMIT ? OFFSET ?`,
-      [mrId, clinicId, String(limit), String(offset)]
+      [mrId, clinicId, sqlLimit, sqlOffset]
     );
 
     const [countRows] = await db.execute(

@@ -4,7 +4,7 @@ const { getPagination, paginatedResponse } = require('../utils/pagination');
 
 class PrescriptionService {
   async getPrescriptions(clinicId, query) {
-    const { page, limit, offset } = getPagination(query);
+    const { page, limit, offset, sqlLimit, sqlOffset } = getPagination(query);
 
     const [rows] = await db.execute(
       `SELECT pr.*, p.full_name AS patient_name, u.full_name AS doctor_name
@@ -14,7 +14,7 @@ class PrescriptionService {
        WHERE pr.clinic_id = ? AND pr.deleted_at IS NULL
        ORDER BY pr.created_at DESC
        LIMIT ? OFFSET ?`,
-      [clinicId, String(limit), String(offset)]
+      [clinicId, sqlLimit, sqlOffset]
     );
 
     const [countRows] = await db.execute(

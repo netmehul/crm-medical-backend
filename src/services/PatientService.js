@@ -92,7 +92,7 @@ class PatientService {
   }
 
   async getPatients(clinicId, query) {
-    const { page, limit, offset } = getPagination(query);
+    const { page, limit, offset, sqlLimit, sqlOffset } = getPagination(query);
 
     let where = 'p.clinic_id = ? AND p.deleted_at IS NULL';
     const params = [clinicId];
@@ -114,7 +114,7 @@ class PatientService {
        WHERE ${where}
        ORDER BY p.created_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, String(limit), String(offset)]
+      [...params, sqlLimit, sqlOffset]
     );
 
     const [countRows] = await db.execute(

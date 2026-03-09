@@ -4,7 +4,7 @@ const { getPagination, paginatedResponse } = require('../utils/pagination');
 
 class AppointmentService {
   async getAppointments(clinicId, query) {
-    const { page, limit, offset } = getPagination(query);
+    const { page, limit, offset, sqlLimit, sqlOffset } = getPagination(query);
 
     let where = 'a.clinic_id = ? AND a.deleted_at IS NULL';
     const params = [clinicId];
@@ -34,7 +34,7 @@ class AppointmentService {
        WHERE ${where}
        ORDER BY a.scheduled_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, String(limit), String(offset)]
+      [...params, sqlLimit, sqlOffset]
     );
 
     const [countRows] = await db.execute(
