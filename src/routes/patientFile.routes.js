@@ -31,6 +31,10 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
+const roleGuard = require('../middleware/roleGuard');
+
+// ... imports
+
 router.use(auth);
 router.use(requireClinic);
 
@@ -50,8 +54,8 @@ router.delete('/:patientId/notes/:id', asyncHandler((req, res) => NoteController
 
 // Billing (Pro only)
 router.get('/:patientId/billing', planGate('billing'), asyncHandler((req, res) => BillingController.getAll(req, res)));
-router.post('/:patientId/billing', planGate('billing'), asyncHandler((req, res) => BillingController.create(req, res)));
-router.put('/:patientId/billing/:id', planGate('billing'), asyncHandler((req, res) => BillingController.update(req, res)));
-router.delete('/:patientId/billing/:id', planGate('billing'), asyncHandler((req, res) => BillingController.delete(req, res)));
+router.post('/:patientId/billing', planGate('billing'), roleGuard('org_admin', 'doctor'), asyncHandler((req, res) => BillingController.create(req, res)));
+router.put('/:patientId/billing/:id', planGate('billing'), roleGuard('org_admin', 'doctor'), asyncHandler((req, res) => BillingController.update(req, res)));
+router.delete('/:patientId/billing/:id', planGate('billing'), roleGuard('org_admin', 'doctor'), asyncHandler((req, res) => BillingController.delete(req, res)));
 
 module.exports = router;
