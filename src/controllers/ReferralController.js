@@ -1,5 +1,5 @@
 const ReferralService = require('../services/ReferralService');
-const LetterService   = require('../services/LetterService');
+const LetterService = require('../services/LetterService');
 const { success, created, notFound } = require('../utils/apiResponse');
 const fs = require('fs');
 
@@ -11,7 +11,7 @@ class ReferralController {
   }
 
   async getOne(req, res) {
-    const data = ReferralService.getReferral(req.params.id, req.clinicId);
+    const data = await ReferralService.getReferral(req.params.id, req.clinicId);
     return success(res, data);
   }
 
@@ -21,12 +21,12 @@ class ReferralController {
   }
 
   async update(req, res) {
-    const data = ReferralService.updateStatus(req.params.id, req.clinicId, req.body.status);
+    const data = await ReferralService.updateStatus(req.params.id, req.clinicId, req.body.status);
     return success(res, data, 'Referral updated');
   }
 
   async delete(req, res) {
-    const data = ReferralService.softDelete(req.params.id, req.clinicId);
+    const data = await ReferralService.softDelete(req.params.id, req.clinicId);
     return success(res, data, 'Referral deleted');
   }
 
@@ -36,7 +36,7 @@ class ReferralController {
   }
 
   async downloadLetter(req, res) {
-    const referral = ReferralService.getReferral(req.params.id, req.clinicId);
+    const referral = await ReferralService.getReferral(req.params.id, req.clinicId);
     if (!referral?.letter_path) return notFound(res, 'Letter not yet generated');
 
     if (!fs.existsSync(referral.letter_path)) return notFound(res, 'Letter file not found');
@@ -57,12 +57,12 @@ class ReferralController {
   }
 
   async updateStatus(req, res) {
-    const data = ReferralService.updateStatus(req.params.id, req.clinicId, req.body.status);
+    const data = await ReferralService.updateStatus(req.params.id, req.clinicId, req.body.status);
     return success(res, data, 'Status updated');
   }
 
   async getCommunications(req, res) {
-    const data = ReferralService.getCommunications(req.params.id, req.clinicId);
+    const data = await ReferralService.getCommunications(req.params.id, req.clinicId);
     return success(res, data);
   }
 }
