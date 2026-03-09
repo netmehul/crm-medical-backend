@@ -4,6 +4,7 @@ const PaymentController = require('../controllers/PaymentController');
 const auth = require('../middleware/auth');
 const requireClinic = require('../middleware/requireClinic');
 const roleGuard = require('../middleware/roleGuard');
+const asyncHandler = require('../middleware/asyncHandler');
 
 router.use(auth);
 router.use(requireClinic);
