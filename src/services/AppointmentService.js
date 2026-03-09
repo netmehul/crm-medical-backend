@@ -76,6 +76,13 @@ class AppointmentService {
         ? `${data.appointment_date} ${data.start_time}:00`
         : data.appointment_date || now);
 
+    const scheduledAtDate = new Date(scheduledAt);
+    const nowDate = new Date();
+    // Allow 1 minute buffer for network latency
+    if (scheduledAtDate < new Date(nowDate.getTime() - 60000)) {
+      throw { statusCode: 400, message: 'Cannot book appointments for past dates or times.' };
+    }
+
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
@@ -128,6 +135,14 @@ class AppointmentService {
     }
 
     if (Object.keys(allowed).length === 0) return existing;
+
+    if (allowed.scheduled_at) {
+      const scheduledAtDate = new Date(allowed.scheduled_at);
+      const nowDate = new Date();
+      if (scheduledAtDate < new Date(nowDate.getTime() - 60000)) {
+        throw { statusCode: 400, message: 'Cannot update appointment to a past date or time.' };
+      }
+    }
 
     allowed.updated_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
     const setClause = Object.keys(allowed).map(k => `${k} = ?`).join(', ');
