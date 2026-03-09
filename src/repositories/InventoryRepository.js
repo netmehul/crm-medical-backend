@@ -34,7 +34,7 @@ class InventoryRepository extends BaseRepository {
          AND item_name LIKE ?
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
-      [clinicId, like, parseInt(limit), parseInt(offset)]
+      [clinicId, like, String(limit), String(offset)]
     );
 
     const [countRows] = await this.db.execute(

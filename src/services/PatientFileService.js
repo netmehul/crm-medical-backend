@@ -50,7 +50,7 @@ class PatientFileService {
        WHERE r.patient_id = ? AND r.clinic_id = ? AND r.deleted_at IS NULL
        ORDER BY r.created_at DESC
        LIMIT ? OFFSET ?`,
-      [patientId, clinicId, parseInt(limit), parseInt(offset)]
+      [patientId, clinicId, String(limit), String(offset)]
     );
 
     const [countRows] = await db.execute(
@@ -109,7 +109,7 @@ class PatientFileService {
        WHERE pn.patient_id = ? AND pn.clinic_id = ? AND pn.deleted_at IS NULL
        ORDER BY pn.created_at DESC
        LIMIT ? OFFSET ?`,
-      [patientId, clinicId, parseInt(limit), parseInt(offset)]
+      [patientId, clinicId, String(limit), String(offset)]
     );
 
     const [countRows] = await db.execute(

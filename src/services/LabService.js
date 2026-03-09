@@ -28,7 +28,7 @@ class LabService {
 
     const [rows] = await db.execute(
       `SELECT * FROM external_labs WHERE ${where} ORDER BY name ASC LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), parseInt(offset)]
+      [...params, String(limit), String(offset)]
     );
 
     const [countRows] = await db.execute(

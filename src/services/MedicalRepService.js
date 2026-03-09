@@ -20,7 +20,7 @@ class MedicalRepService {
        WHERE ${where}
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), parseInt(offset)]
+      [...params, String(limit), String(offset)]
     );
 
     const [countRows] = await db.execute(
@@ -138,7 +138,7 @@ class MedicalRepService {
        WHERE v.mr_id = ? AND v.clinic_id = ?
        ORDER BY v.visit_date DESC
        LIMIT ? OFFSET ?`,
-      [mrId, clinicId, parseInt(limit), parseInt(offset)]
+      [mrId, clinicId, String(limit), String(offset)]
     );
 
     const [countRows] = await db.execute(

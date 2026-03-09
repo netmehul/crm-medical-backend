@@ -21,7 +21,7 @@ class AppointmentRepository extends BaseRepository {
        WHERE clinic_id = ? AND doctor_id = ? AND deleted_at IS NULL
        ORDER BY scheduled_at DESC
        LIMIT ? OFFSET ?`,
-      [clinicId, doctorId, parseInt(limit), parseInt(offset)]
+      [clinicId, doctorId, String(limit), String(offset)]
     );
 
     const [countRows] = await this.db.execute(
@@ -50,7 +50,7 @@ class AppointmentRepository extends BaseRepository {
          AND status = 'scheduled' AND scheduled_at > CURRENT_TIMESTAMP
        ORDER BY scheduled_at ASC
        LIMIT ?`,
-      [clinicId, parseInt(limit)]
+      [clinicId, String(limit)]
     );
     return rows;
   }

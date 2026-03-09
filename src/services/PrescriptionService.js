@@ -14,7 +14,7 @@ class PrescriptionService {
        WHERE pr.clinic_id = ? AND pr.deleted_at IS NULL
        ORDER BY pr.created_at DESC
        LIMIT ? OFFSET ?`,
-      [clinicId, parseInt(limit), parseInt(offset)]
+      [clinicId, String(limit), String(offset)]
     );
 
     const [countRows] = await db.execute(

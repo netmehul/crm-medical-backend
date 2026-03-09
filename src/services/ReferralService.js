@@ -109,7 +109,7 @@ class ReferralService {
        WHERE ${where}
        ORDER BY r.created_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), parseInt(offset)]
+      [...params, String(limit), String(offset)]
     );
 
     const [countRows] = await db.execute(

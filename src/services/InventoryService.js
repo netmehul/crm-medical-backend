@@ -20,7 +20,7 @@ class InventoryService {
 
     const [rows] = await db.execute(
       `SELECT * FROM inventory WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), parseInt(offset)]
+      [...params, String(limit), String(offset)]
     );
 
     const [countRows] = await db.execute(

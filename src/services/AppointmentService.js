@@ -34,7 +34,7 @@ class AppointmentService {
        WHERE ${where}
        ORDER BY a.scheduled_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), parseInt(offset)]
+      [...params, String(limit), String(offset)]
     );
 
     const [countRows] = await db.execute(

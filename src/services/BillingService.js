@@ -25,7 +25,7 @@ class BillingService {
        WHERE ${where}
        ORDER BY b.created_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), parseInt(offset)]
+      [...params, String(limit), String(offset)]
     );
 
     const [countRows] = await db.execute(
