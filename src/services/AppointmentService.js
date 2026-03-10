@@ -75,6 +75,10 @@ class AppointmentService {
       throw { statusCode: 400, message: 'Doctor is required. Please ensure you are logged in.' };
     }
 
+    if (!data.patient_id) {
+      throw { statusCode: 400, message: 'Patient is required. Please select a patient.' };
+    }
+
     const scheduledAt = data.scheduled_at
       || (data.appointment_date && data.start_time
         ? `${data.appointment_date} ${data.start_time}:00`
@@ -97,7 +101,7 @@ class AppointmentService {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, clinicId,
-          data.patient_id, doctorId,
+          data.patient_id || null, doctorId,
           data.file_id || null,
           scheduledAt,
           data.duration_mins || 30,
@@ -136,6 +140,10 @@ class AppointmentService {
     ];
     for (const f of fields) {
       if (data[f] !== undefined) allowed[f] = data[f];
+    }
+
+    if ('patient_id' in allowed && !allowed.patient_id) {
+      throw { statusCode: 400, message: 'Patient is required. Please select a patient.' };
     }
 
     if (Object.keys(allowed).length === 0) return existing;
