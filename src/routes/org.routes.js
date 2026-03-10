@@ -20,6 +20,6 @@ router.post('/team/invite',      planGate('seats'), asyncHandler((req, res) => O
 router.put('/team/:userId',      asyncHandler((req, res) => OrgController.updateUser(req, res)));
 router.delete('/team/:userId',   asyncHandler((req, res) => OrgController.deactivateUser(req, res)));
 
-router.get('/billing',           asyncHandler((req, res) => OrgController.getBilling(req, res)));
+router.get('/subscription',      asyncHandler((req, res) => OrgController.getSubscription(req, res)));
 
 module.exports = router;

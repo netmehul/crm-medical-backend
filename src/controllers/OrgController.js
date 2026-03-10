@@ -47,8 +47,8 @@ class OrgController {
     return success(res, data, 'User deactivated');
   }
 
-  async getBilling(req, res) {
-    const data = await OrgService.getBillingInfo(req.orgId);
+  async getSubscription(req, res) {
+    const data = await OrgService.getSubscriptionInfo(req.orgId);
     return success(res, data);
   }
 }

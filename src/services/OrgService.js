@@ -260,7 +260,7 @@ class OrgService {
     return { id: userId, deactivated: true };
   }
 
-  async getBillingInfo(orgId) {
+  async getSubscriptionInfo(orgId) {
     const [orgs] = await db.execute(
       `SELECT id, name, plan, plan_status, plan_activated_at FROM organizations WHERE id = ? AND deleted_at IS NULL`,
       [orgId]
