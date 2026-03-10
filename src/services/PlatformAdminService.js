@@ -7,7 +7,7 @@ class PlatformAdminService {
       `SELECT COUNT(*) AS count FROM organizations WHERE deleted_at IS NULL`,
       []
     );
-    const totalOrgs = totalOrgsRow[0].count;
+    const totalOrgs = totalOrgsRow[0]?.count || 0;
 
     const [suspendedOrgsRow] = await db.execute(
       `SELECT COUNT(*) AS count FROM organizations WHERE plan_status = 'suspended' AND deleted_at IS NULL`,
@@ -105,7 +105,7 @@ class PlatformAdminService {
     }
 
     const [rows] = await db.execute(
-      `SELECT o.id, o.name, o.slug, o.owner_email, o.plan, o.plan_status, o.created_at,
+      `SELECT o.id, o.name, o.owner_email, o.plan, o.plan_status, o.created_at,
         (SELECT COUNT(*) FROM clinics c WHERE c.organization_id = o.id AND c.deleted_at IS NULL) AS branch_count,
         (SELECT COUNT(*) FROM users u WHERE u.organization_id = o.id AND u.deleted_at IS NULL) AS user_count
        FROM organizations o
@@ -125,8 +125,8 @@ class PlatformAdminService {
 
   async getOrganization(idOrSlug) {
     const [orgRows] = await db.execute(
-      `SELECT * FROM organizations WHERE (id = ? OR slug = ?) AND deleted_at IS NULL`,
-      [idOrSlug, idOrSlug]
+      `SELECT * FROM organizations WHERE id = ? AND deleted_at IS NULL`,
+      [idOrSlug]
     );
     const org = orgRows[0];
     if (!org) throw { statusCode: 404, message: 'Organization not found' };
