@@ -13,12 +13,12 @@ class InventoryController {
   }
 
   async create(req, res) {
-    const data = await InventoryService.createItem(req.clinicId, req.body);
+    const data = await InventoryService.createItem(req.clinicId, req.body, req.userId);
     return created(res, data, 'Item added to inventory');
   }
 
   async update(req, res) {
-    const data = await InventoryService.updateItem(req.params.id, req.clinicId, req.body);
+    const data = await InventoryService.updateItem(req.params.id, req.clinicId, req.body, req.userId);
     return success(res, data, 'Item updated successfully');
   }
 
@@ -36,6 +36,21 @@ class InventoryController {
 
   async getLowStock(req, res) {
     const data = await InventoryService.getLowStock(req.clinicId);
+    return success(res, data);
+  }
+
+  async markAsPaid(req, res) {
+    const data = await InventoryService.markAsPaid(req.params.id, req.clinicId, req.body);
+    return success(res, data, 'Payment recorded successfully');
+  }
+
+  async getSupplierReport(req, res) {
+    const data = await InventoryService.getSupplierReport(req.clinicId);
+    return success(res, data);
+  }
+
+  async getPaymentSummary(req, res) {
+    const data = await InventoryService.getPaymentSummary(req.clinicId);
     return success(res, data);
   }
 }

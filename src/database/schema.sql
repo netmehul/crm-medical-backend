@@ -86,6 +86,42 @@ CREATE TABLE IF NOT EXISTS clinic_members (
 );
 
 -- ─────────────────────────────────────────
+-- SUPPLIERS
+-- ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS suppliers (
+  id               VARCHAR(36) PRIMARY KEY,
+  clinic_id        VARCHAR(36) NOT NULL,
+  name             VARCHAR(255) NOT NULL,
+  contact_person   VARCHAR(255),
+  phone            VARCHAR(50),
+  email            VARCHAR(255),
+  address          TEXT,
+  notes            TEXT,
+  is_active        TINYINT(1) DEFAULT 1,
+  deleted_at       DATETIME NULL,
+  created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (clinic_id) REFERENCES clinics(id)
+);
+
+CREATE TABLE IF NOT EXISTS supplier_visits (
+  id               VARCHAR(36) PRIMARY KEY,
+  clinic_id        VARCHAR(36) NOT NULL,
+  supplier_id      VARCHAR(36) NOT NULL,
+  visit_date       DATETIME NOT NULL,
+  rep_name         VARCHAR(255),
+  rep_phone        VARCHAR(50),
+  purpose          VARCHAR(50) DEFAULT 'delivery',
+  notes            TEXT,
+  logged_by        VARCHAR(36),
+  deleted_at       DATETIME NULL,
+  created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (clinic_id)    REFERENCES clinics(id),
+  FOREIGN KEY (supplier_id)  REFERENCES suppliers(id),
+  FOREIGN KEY (logged_by)    REFERENCES users(id)
+);
+
+-- ─────────────────────────────────────────
 -- PATIENTS
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS patients (
@@ -280,18 +316,22 @@ CREATE TABLE IF NOT EXISTS patient_billing (
 -- INVENTORY (Pro only)
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS inventory (
-  id                  VARCHAR(36) PRIMARY KEY,
-  clinic_id           VARCHAR(36) NOT NULL,
-  item_name           VARCHAR(255) NOT NULL,
-  category            VARCHAR(255) DEFAULT 'other',
-  quantity            INTEGER DEFAULT 0,
-  unit                VARCHAR(255),
-  low_stock_threshold INTEGER DEFAULT 10,
-  notes               TEXT,
-  deleted_at          DATETIME DEFAULT NULL,
-  created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (clinic_id) REFERENCES clinics(id)
+  id                   VARCHAR(36) PRIMARY KEY,
+  clinic_id            VARCHAR(36) NOT NULL,
+  item_name            VARCHAR(255) NOT NULL,
+  category             VARCHAR(255) DEFAULT 'other',
+  quantity             INTEGER DEFAULT 0,
+  unit                 VARCHAR(255),
+  low_stock_threshold  INTEGER DEFAULT 10,
+  notes                TEXT,
+  supplier_id          VARCHAR(36) NULL,
+  cost_per_unit_cents  INT DEFAULT 0,
+  selling_price_cents  INT DEFAULT 0,
+  deleted_at           DATETIME DEFAULT NULL,
+  created_at           DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at           DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (clinic_id) REFERENCES clinics(id),
+  FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
 );
 
 CREATE TABLE IF NOT EXISTS inventory_transactions (
@@ -302,10 +342,44 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
   quantity     INTEGER NOT NULL,
   reason       VARCHAR(255),
   performed_by VARCHAR(36),
+  stock_type         VARCHAR(20) DEFAULT 'purchased',
+  unit_cost_cents    INT DEFAULT 0,
+  total_cost_cents   INT DEFAULT 0,
+  supplier_id        VARCHAR(36) NULL,
+  supplier_visit_id  VARCHAR(36) NULL,
+  invoice_number     VARCHAR(100) NULL,
+  invoice_date       DATE NULL,
+  payment_due_date   DATE NULL,
+  payment_status     VARCHAR(20) DEFAULT 'pending',
+  paid_at            DATETIME NULL,
+  paid_amount_cents  INT DEFAULT 0,
+  notes              TEXT NULL,
   created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (clinic_id)    REFERENCES clinics(id),
   FOREIGN KEY (inventory_id) REFERENCES inventory(id),
-  FOREIGN KEY (performed_by) REFERENCES users(id)
+  FOREIGN KEY (performed_by) REFERENCES users(id),
+  FOREIGN KEY (supplier_id)  REFERENCES suppliers(id),
+  FOREIGN KEY (supplier_visit_id)  REFERENCES supplier_visits(id)
+);
+
+-- ─────────────────────────────────────────
+-- NOTIFICATIONS
+-- ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS notifications (
+  id            VARCHAR(36) PRIMARY KEY,
+  clinic_id     VARCHAR(36) NOT NULL,
+  user_id       VARCHAR(36) NULL,
+  type          VARCHAR(50) NOT NULL,
+  title         VARCHAR(255) NOT NULL,
+  message       TEXT NOT NULL,
+  reference_id  VARCHAR(36) NULL,
+  reference_type VARCHAR(50) NULL,
+  is_read       TINYINT(1) DEFAULT 0,
+  read_at       DATETIME NULL,
+  due_date      DATE NULL,
+  deleted_at    DATETIME NULL,
+  created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (clinic_id) REFERENCES clinics(id)
 );
 
 -- ─────────────────────────────────────────

@@ -15,5 +15,7 @@ router.use('/medical-reps',  require('./medicalRep.routes'));
 router.use('/payments',      require('./payment.routes'));
 router.use('/labs',           require('./lab.routes'));
 router.use('/referrals',      require('./referral.routes'));
+router.use('/suppliers',      require('./supplier.routes'));
+router.use('/notifications',  require('./notification.routes'));
 
 module.exports = router;
